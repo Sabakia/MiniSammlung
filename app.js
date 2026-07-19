@@ -147,38 +147,50 @@ function karteHTML(f) {
   if (_urls.length === 0 && f.bild_url) _urls = [f.bild_url]
   const bilder = _urls
 
-  let bildEl = ''
+  const metaZeile = [
+    f.alkohol_vol ? `<span>${esc(f.alkohol_vol)}% Vol</span>` : '',
+    f.groesse_ml  ? `<span>${esc(f.groesse_ml)} ml</span>`   : '',
+    f.material    ? `<span>${esc(f.material)}</span>`         : '',
+  ].filter(Boolean).join('')
+
+  const extraZeilen = [
+    f.geschmack      ? `<p class="karte-geschmack">${esc(f.geschmack)}</p>`       : '',
+    f.destillerie    ? `<p class="karte-herkunft">🏭 ${esc(f.destillerie)}</p>`   : '',
+    f.hergestellt_in ? `<p class="karte-herkunft">🌍 ${esc(f.hergestellt_in)}</p>` : '',
+    f.notiz          ? `<p class="karte-notiz">${esc(f.notiz)}</p>`               : '',
+    f.hinzugefuegt   ? `<p class="karte-datum">${esc(f.hinzugefuegt)}</p>`        : '',
+  ].filter(Boolean).join('')
+
   if (bilder.length > 0) {
     const thumbs = bilder.length > 1
       ? `<div class="karte-thumbs">${bilder.map((u, i) =>
-          `<img src="${esc(u)}" class="karte-thumb${i === 0 ? ' aktiv' : ''}" loading="lazy" data-idx="${i}">`
+          `<img src="${esc(u)}" class="karte-thumb${i === 0 ? ' aktiv' : ''}" loading="lazy">`
         ).join('')}</div>`
       : ''
-    bildEl = `<div class="karte-galerie" data-bilder='${JSON.stringify(bilder)}'>
-      <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
-      ${thumbs}
-    </div>`
+
+    return `
+    <article class="flasche-karte mit-bild">
+      <div class="karte-galerie">
+        <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
+        <div class="karte-overlay">
+          <span class="karte-kat">${esc(f.kategorie)}</span>
+          <h3 class="karte-name">${esc(f.name)}</h3>
+          ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
+        </div>
+        ${thumbs}
+      </div>
+      ${extraZeilen ? `<div class="karte-extra">${extraZeilen}</div>` : ''}
+    </article>`
   }
 
-  const infos = [
-    f.groesse_ml  ? `<span>🍶 ${esc(f.groesse_ml)} ml</span>` : '',
-    f.alkohol_vol ? `<span>🔥 ${esc(f.alkohol_vol)}% Vol</span>` : '',
-    f.material    ? `<span>📦 ${esc(f.material)}</span>` : '',
-  ].filter(Boolean).join('')
-
   return `
-  <article class="flasche-karte">
-    ${bildEl}
-    <div class="karte-body">
+  <article class="flasche-karte ohne-bild">
+    <div class="karte-kein-bild" data-kat="${esc(f.kategorie)}">
       <span class="karte-kat">${esc(f.kategorie)}</span>
       <h3 class="karte-name">${esc(f.name)}</h3>
-      ${infos ? `<div class="karte-infos">${infos}</div>` : ''}
-      ${f.geschmack      ? `<p class="karte-geschmack">🍫 ${esc(f.geschmack)}</p>` : ''}
-      ${f.destillerie    ? `<p class="karte-meta">🏭 ${esc(f.destillerie)}</p>` : ''}
-      ${f.hergestellt_in ? `<p class="karte-meta">🌍 ${esc(f.hergestellt_in)}</p>` : ''}
-      ${f.hinzugefuegt   ? `<p class="karte-datum">📅 ${esc(f.hinzugefuegt)}</p>` : ''}
-      ${f.notiz          ? `<p class="karte-notiz">💬 ${esc(f.notiz)}</p>` : ''}
+      ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
     </div>
+    ${extraZeilen ? `<div class="karte-extra">${extraZeilen}</div>` : ''}
   </article>`
 }
 
