@@ -517,6 +517,10 @@ main { padding: 1px; }
   line-height: 1.4;
   color: var(--muted);
   margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .karte-extra .karte-geschmack {
@@ -524,6 +528,15 @@ main { padding: 1px; }
   font-style: italic;
   font-size: 13px;
   color: var(--text);
+  -webkit-line-clamp: 2;
+}
+
+.karte-extra .karte-notiz {
+  -webkit-line-clamp: 3;
+}
+
+.karte-extra .karte-herkunft {
+  -webkit-line-clamp: 1;
 }
 
 .karte-extra .karte-datum {
@@ -531,6 +544,54 @@ main { padding: 1px; }
   letter-spacing: .08em;
   color: var(--dim);
   margin-top: 2px;
+  -webkit-line-clamp: 1;
+}
+
+/* ── Edit button (admin only) ── */
+.edit-btn {
+  display: none;
+  position: absolute;
+  top: 8px; right: 8px;
+  z-index: 10;
+  background: rgba(12,10,7,.8);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: 13px;
+  width: 28px; height: 28px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .2s, border-color .15s, color .15s;
+  backdrop-filter: blur(4px);
+}
+
+.admin .flasche-karte:hover .edit-btn {
+  display: flex;
+  opacity: 1;
+}
+
+.edit-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+/* ── Multi-photo badge ── */
+.foto-anzahl {
+  position: absolute;
+  top: 8px; left: 8px;
+  z-index: 4;
+  background: rgba(12,10,7,.75);
+  border: 1px solid rgba(193,127,58,.4);
+  border-radius: var(--r-sm);
+  color: var(--amber-2);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 2px 7px;
+  backdrop-filter: blur(4px);
 }
 
 /* ── No-image card ── */

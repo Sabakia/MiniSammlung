@@ -4,6 +4,7 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 let alleFlaschen     = []
 let aktiveKategorie  = 'alle'
 let suchbegriff      = ''
+let bearbeitungsId   = null   // null = neue Flasche; ID = Bearbeiten-Modus
 
 // ─── HTML escaping ────────────────────────────────────────────────────────────
 function esc(str) {
@@ -22,6 +23,7 @@ function updateAuthUI(user) {
   document.getElementById('login-btn').style.display   = eingeloggt ? 'none' : ''
   document.getElementById('logout-btn').style.display  = eingeloggt ? '' : 'none'
   document.getElementById('import-btn').style.display  = eingeloggt ? '' : 'none'
+  document.body.classList.toggle('admin', eingeloggt)
 }
 
 function loginModalOeffnen() {
@@ -161,23 +163,24 @@ function karteHTML(f) {
     f.hinzugefuegt   ? `<p class="karte-datum">${esc(f.hinzugefuegt)}</p>`        : '',
   ].filter(Boolean).join('')
 
+  const editBtn = `<button class="edit-btn" data-id="${esc(f.id)}" title="Bearbeiten">✎</button>`
+
   if (bilder.length > 0) {
-    const thumbs = bilder.length > 1
-      ? `<div class="karte-thumbs">${bilder.map((u, i) =>
-          `<img src="${esc(u)}" class="karte-thumb${i === 0 ? ' aktiv' : ''}" loading="lazy">`
-        ).join('')}</div>`
+    const fotoBadge = bilder.length > 1
+      ? `<div class="foto-anzahl">📷 ${bilder.length}</div>`
       : ''
 
     return `
     <article class="flasche-karte mit-bild">
       <div class="karte-galerie">
         <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
+        ${fotoBadge}
+        ${editBtn}
         <div class="karte-overlay">
           <span class="karte-kat">${esc(f.kategorie)}</span>
           <h3 class="karte-name">${esc(f.name)}</h3>
           ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
         </div>
-        ${thumbs}
       </div>
       ${extraZeilen ? `<div class="karte-extra">${extraZeilen}</div>` : ''}
     </article>`
@@ -187,6 +190,7 @@ function karteHTML(f) {
   <article class="flasche-karte ohne-bild">
     <div class="karte-kein-bild" data-kat="${esc(f.kategorie)}">
       <div class="karte-inner-border"></div>
+      ${editBtn}
       <span class="karte-kat">${esc(f.kategorie)}</span>
       <h3 class="karte-name">${esc(f.name)}</h3>
       ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
@@ -228,6 +232,76 @@ async function flascheSpeichern(daten, bildDatei) {
 
   const { error } = await client.from('flaschen').insert({ ...daten, bild_url: bildUrl })
   if (error) throw new Error(error.message)
+}
+
+// ─── Update existing bottle ───────────────────────────────────────────────────
+async function flascheAktualisieren(id, daten, bildDatei) {
+  if (bildDatei) {
+    const sicherName = bildDatei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const dateiname  = `${Date.now()}-${sicherName}`
+    const { error: uploadFehler } = await client.storage
+      .from('SammlungBilder')
+      .upload(dateiname, bildDatei)
+
+    if (uploadFehler) throw new Error('Bild-Upload: ' + uploadFehler.message)
+
+    const { data: urlDaten } = client.storage.from('SammlungBilder').getPublicUrl(dateiname)
+    const neueUrl = urlDaten.publicUrl
+
+    // Append new URL to existing bild_urls
+    const alteFlaschen = alleFlaschen.find(f => f.id === id)
+    let alleUrls = []
+    if (alteFlaschen?.bild_urls) {
+      try { alleUrls = JSON.parse(alteFlaschen.bild_urls) } catch { alleUrls = [] }
+    }
+    if (alleUrls.length === 0 && alteFlaschen?.bild_url) alleUrls = [alteFlaschen.bild_url]
+    alleUrls.push(neueUrl)
+
+    daten.bild_url  = alleUrls[0]
+    daten.bild_urls = JSON.stringify(alleUrls)
+  }
+
+  const { error } = await client.from('flaschen').update(daten).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ─── Open edit modal prefilled ────────────────────────────────────────────────
+function flascheBearbeiten(id) {
+  const f = alleFlaschen.find(f => f.id === id)
+  if (!f) return
+
+  bearbeitungsId = id
+  fuelleDatalist()
+
+  document.getElementById('modal-overlay').classList.add('offen')
+  document.querySelector('#modal-overlay .modal-header h2').textContent = 'Flasche bearbeiten'
+  document.getElementById('form-speichern').textContent = 'Aktualisieren'
+
+  document.getElementById('f-name').value         = f.name          || ''
+  document.getElementById('f-kategorie').value    = f.kategorie     || ''
+  document.getElementById('f-groesse').value      = f.groesse_ml    || ''
+  document.getElementById('f-alkohol').value      = f.alkohol_vol   || ''
+  document.getElementById('f-material').value     = f.material      || ''
+  document.getElementById('f-hinzugefuegt').value = f.hinzugefuegt  || ''
+  document.getElementById('f-geschmack').value    = f.geschmack     || ''
+  document.getElementById('f-destillerie').value  = f.destillerie   || ''
+  document.getElementById('f-hergestellt').value  = f.hergestellt_in || ''
+
+  // Show existing photos
+  let urls = []
+  if (f.bild_urls) { try { urls = JSON.parse(f.bild_urls) } catch { urls = [] } }
+  if (urls.length === 0 && f.bild_url) urls = [f.bild_url]
+
+  const vorschau    = document.getElementById('foto-vorschau')
+  const vorschauImg = document.getElementById('foto-vorschau-img')
+  if (urls.length > 0) {
+    vorschauImg.src = urls[0]
+    vorschau.style.display = 'block'
+  } else {
+    vorschau.style.display = 'none'
+  }
+
+  document.getElementById('f-name').focus()
 }
 
 // ─── Export as JSON ───────────────────────────────────────────────────────────
@@ -281,7 +355,10 @@ function modalSchliessen() {
   document.getElementById('modal-overlay').classList.remove('offen')
   document.getElementById('flasche-form').reset()
   document.getElementById('foto-vorschau').style.display = 'none'
+  document.querySelector('#modal-overlay .modal-header h2').textContent = 'Neue Flasche'
+  document.getElementById('form-speichern').textContent = 'Speichern'
   formAlertSetzen('', '')
+  bearbeitungsId = null
 }
 
 function formAlertSetzen(text, typ) {
@@ -384,31 +461,39 @@ function initEvents() {
     if (!kat)  { formAlertSetzen('Kategorie ist erforderlich.', 'err'); return }
 
     speichern.disabled    = true
-    speichern.textContent = 'Speichere…'
+    speichern.textContent = bearbeitungsId ? 'Aktualisiere…' : 'Speichere…'
+
+    const daten = {
+      name,
+      kategorie:      kat,
+      groesse_ml:     document.getElementById('f-groesse').value.trim()      || null,
+      alkohol_vol:    document.getElementById('f-alkohol').value.trim()      || null,
+      material:       document.getElementById('f-material').value            || null,
+      hinzugefuegt:   document.getElementById('f-hinzugefuegt').value.trim() || null,
+      geschmack:      document.getElementById('f-geschmack').value.trim()    || null,
+      destillerie:    document.getElementById('f-destillerie').value.trim()  || null,
+      hergestellt_in: document.getElementById('f-hergestellt').value.trim()  || null,
+    }
+    const bildDatei = document.getElementById('f-foto').files[0] || null
 
     try {
-      await flascheSpeichern({
-        name,
-        kategorie:      kat,
-        groesse_ml:     document.getElementById('f-groesse').value.trim()     || null,
-        alkohol_vol:    document.getElementById('f-alkohol').value.trim()     || null,
-        material:       document.getElementById('f-material').value           || null,
-        hinzugefuegt:   document.getElementById('f-hinzugefuegt').value.trim() || null,
-        geschmack:      document.getElementById('f-geschmack').value.trim()   || null,
-        destillerie:    document.getElementById('f-destillerie').value.trim() || null,
-        hergestellt_in: document.getElementById('f-hergestellt').value.trim() || null,
-      }, document.getElementById('f-foto').files[0] || null)
+      if (bearbeitungsId) {
+        await flascheAktualisieren(bearbeitungsId, daten, bildDatei)
+        statusSetzen('✓ ' + name + ' aktualisiert', 'ok')
+      } else {
+        await flascheSpeichern(daten, bildDatei)
+        statusSetzen('✓ ' + name + ' gespeichert', 'ok')
+      }
 
       await ladeFlaschen()
       renderKategorien()
       renderFlaschen()
       modalSchliessen()
-      statusSetzen('✓ ' + name + ' gespeichert', 'ok')
     } catch (err) {
       formAlertSetzen('Fehler: ' + err.message, 'err')
     } finally {
       speichern.disabled    = false
-      speichern.textContent = 'Speichern'
+      speichern.textContent = bearbeitungsId ? 'Aktualisieren' : 'Speichern'
     }
   })
 
@@ -433,16 +518,12 @@ function initEvents() {
   })
 }
 
-// ─── Thumbnail gallery click ─────────────────────────────────────────────────
+// ─── Edit button click ────────────────────────────────────────────────────────
 document.addEventListener('click', e => {
-  const thumb = e.target.closest('.karte-thumb')
-  if (!thumb) return
-  const galerie = thumb.closest('.karte-galerie')
-  if (!galerie) return
-  const hauptbild = galerie.querySelector('.karte-bild')
-  hauptbild.src = thumb.src
-  galerie.querySelectorAll('.karte-thumb').forEach(t => t.classList.remove('aktiv'))
-  thumb.classList.add('aktiv')
+  const btn = e.target.closest('.edit-btn')
+  if (!btn) return
+  e.stopPropagation()
+  flascheBearbeiten(btn.dataset.id)
 })
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
