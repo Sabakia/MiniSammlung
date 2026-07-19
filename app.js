@@ -65,7 +65,7 @@ function updateGesamtAnzahl() {
   const n = alleFlaschen.length
   const el = document.getElementById('gesamt-anzahl')
   if (el) {
-    el.innerHTML = `<strong>${n}</strong> ${n === 1 ? 'Flasche' : 'Flaschen'}`
+    el.innerHTML = `<strong>${n}</strong><span class="label">${n === 1 ? 'Flasche' : 'Flaschen'}</span>`
   }
 }
 
@@ -186,6 +186,7 @@ function karteHTML(f) {
   return `
   <article class="flasche-karte ohne-bild">
     <div class="karte-kein-bild" data-kat="${esc(f.kategorie)}">
+      <div class="karte-inner-border"></div>
       <span class="karte-kat">${esc(f.kategorie)}</span>
       <h3 class="karte-name">${esc(f.name)}</h3>
       ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
@@ -411,6 +412,12 @@ function initEvents() {
     }
   })
 
+  // Sticky header scroll class
+  const stickyHeader = document.getElementById('sticky-header')
+  window.addEventListener('scroll', () => {
+    stickyHeader.classList.toggle('scrolled', window.scrollY > 40)
+  }, { passive: true })
+
   // Export
   document.getElementById('export-btn').addEventListener('click', exportDaten)
 
@@ -440,8 +447,7 @@ document.addEventListener('click', e => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('flaschen-grid').innerHTML =
-    '<div class="lade-container"><div class="leer-icon">🍾</div><div class="spinner"></div></div>'
+  document.getElementById('flaschen-grid').innerHTML = ''
 
   // Auth state listener
   client.auth.onAuthStateChange((_event, session) => {
