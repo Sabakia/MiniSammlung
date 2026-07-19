@@ -497,6 +497,15 @@ function initEvents() {
     }
   })
 
+  // Detail modal close
+  document.getElementById('detail-close').addEventListener('click', () => {
+    document.getElementById('detail-overlay').classList.remove('offen')
+  })
+  document.getElementById('detail-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget)
+      document.getElementById('detail-overlay').classList.remove('offen')
+  })
+
   // Sticky header scroll class
   const stickyHeader = document.getElementById('sticky-header')
   window.addEventListener('scroll', () => {
@@ -525,6 +534,58 @@ document.addEventListener('click', e => {
   e.stopPropagation()
   flascheBearbeiten(btn.dataset.id)
 })
+
+// ─── Card click → detail modal ────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const karte = e.target.closest('.flasche-karte')
+  if (!karte) return
+  if (e.target.closest('.edit-btn')) return
+  const id = karte.querySelector('.edit-btn')?.dataset.id
+  if (!id) return
+  detailOeffnen(id)
+})
+
+function detailOeffnen(id) {
+  const f = alleFlaschen.find(f => String(f.id) === String(id))
+  if (!f) return
+
+  let urls = []
+  if (f.bild_urls) { try { urls = JSON.parse(f.bild_urls) } catch { urls = [] } }
+  if (urls.length === 0 && f.bild_url) urls = [f.bild_url]
+
+  document.getElementById('detail-kat').textContent  = f.kategorie || ''
+  document.getElementById('detail-name').textContent = f.name      || ''
+
+  // Photos
+  const bilderEl = document.getElementById('detail-bilder')
+  bilderEl.innerHTML = urls.map(u => `<img src="${esc(u)}" loading="lazy">`).join('')
+
+  // Info rows
+  const reihen = [
+    f.alkohol_vol    && { label: 'Alkohol',     wert: f.alkohol_vol + ' % Vol' },
+    f.groesse_ml     && { label: 'Größe',        wert: f.groesse_ml + ' ml' },
+    f.material       && { label: 'Material',     wert: f.material },
+    f.destillerie    && { label: 'Destillerie',  wert: f.destillerie },
+    f.hergestellt_in && { label: 'Hergestellt',  wert: f.hergestellt_in },
+    f.hinzugefuegt   && { label: 'Hinzugefügt',  wert: f.hinzugefuegt },
+    f.geschmack      && { label: 'Geschmack',    wert: f.geschmack },
+  ].filter(Boolean)
+
+  const body = document.getElementById('detail-body')
+  body.innerHTML =
+    (reihen.length ? `<div class="detail-meta-zeile">${
+      [f.alkohol_vol, f.groesse_ml, f.material].filter(Boolean)
+        .map(v => `<span>${esc(String(v))}${v === f.alkohol_vol ? ' % Vol' : v === f.groesse_ml ? ' ml' : ''}</span>`)
+        .join('')
+    }</div>` : '') +
+    reihen.filter(r => !['Alkohol','Größe','Material'].includes(r.label)).map(r =>
+      `<div class="detail-reihe"><span class="label">${esc(r.label)}</span><span>${esc(r.wert)}</span></div>`
+    ).join('') +
+    (f.notiz ? `<p class="detail-notiz">${esc(f.notiz)}</p>` : '')
+
+  document.getElementById('detail-overlay').classList.add('offen')
+}
+
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
