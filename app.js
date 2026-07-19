@@ -392,60 +392,49 @@ function formAlertSetzen(text, typ) {
   el.className   = 'form-alert ' + typ
 }
 
-// ─── Multi-photo preview ──────────────────────────────────────────────────────
-function fotoVorschauZeigen(dateien) {
-  vorschauDateien = dateien
+// ─── Photo preview — renders behalteneUrls + vorschauDateien together ─────────
+function renderFotoVorschau() {
   const grid = document.getElementById('foto-vorschau')
   grid.innerHTML = ''
 
-  dateien.forEach((datei, i) => {
+  behalteneUrls.forEach((url, i) => {
     const item = document.createElement('div')
     item.className = 'foto-vorschau-item'
+    const img = document.createElement('img')
+    img.src = url; img.loading = 'lazy'
+    const btn = document.createElement('button')
+    btn.className = 'remove-foto'; btn.type = 'button'; btn.textContent = '✕'
+    btn.addEventListener('click', () => {
+      behalteneUrls = behalteneUrls.filter((_, idx) => idx !== i)
+      renderFotoVorschau()
+    })
+    item.appendChild(img); item.appendChild(btn); grid.appendChild(item)
+  })
 
+  vorschauDateien.forEach((datei, i) => {
+    const item = document.createElement('div')
+    item.className = 'foto-vorschau-item'
     const img = document.createElement('img')
     img.src = URL.createObjectURL(datei)
-
     const btn = document.createElement('button')
-    btn.className = 'remove-foto'
-    btn.type = 'button'
-    btn.textContent = '✕'
+    btn.className = 'remove-foto'; btn.type = 'button'; btn.textContent = '✕'
     btn.addEventListener('click', () => {
       vorschauDateien = vorschauDateien.filter((_, idx) => idx !== i)
-      fotoVorschauZeigen(vorschauDateien)
+      renderFotoVorschau()
     })
-
-    item.appendChild(img)
-    item.appendChild(btn)
-    grid.appendChild(item)
+    item.appendChild(img); item.appendChild(btn); grid.appendChild(item)
   })
 }
 
+function fotoVorschauZeigen(dateien) {
+  vorschauDateien = dateien
+  renderFotoVorschau()
+}
+
 function fotoVorschauUrls(urls) {
-  behalteneUrls = [...urls]
-  const grid = document.getElementById('foto-vorschau')
-  grid.innerHTML = ''
-
-  urls.forEach((url, i) => {
-    const item = document.createElement('div')
-    item.className = 'foto-vorschau-item'
-
-    const img = document.createElement('img')
-    img.src     = url
-    img.loading = 'lazy'
-
-    const btn = document.createElement('button')
-    btn.className   = 'remove-foto'
-    btn.type        = 'button'
-    btn.textContent = '✕'
-    btn.addEventListener('click', () => {
-      behalteneUrls = behalteneUrls.filter((_, idx) => idx !== i)
-      fotoVorschauUrls(behalteneUrls)
-    })
-
-    item.appendChild(img)
-    item.appendChild(btn)
-    grid.appendChild(item)
-  })
+  behalteneUrls   = [...urls]
+  vorschauDateien = []
+  renderFotoVorschau()
 }
 
 // ─── Auth events ─────────────────────────────────────────────────────────────
@@ -513,9 +502,10 @@ function initEvents() {
     if (e.target === e.currentTarget) modalSchliessen()
   })
 
-  // Image preview — append multiple files
+  // Image preview — append new files to existing
   document.getElementById('f-foto').addEventListener('change', e => {
-    fotoVorschauZeigen([...vorschauDateien, ...Array.from(e.target.files)])
+    vorschauDateien = [...vorschauDateien, ...Array.from(e.target.files)]
+    renderFotoVorschau()
     e.target.value = ''
   })
 
@@ -539,7 +529,7 @@ function initEvents() {
     e.preventDefault()
     uploadArea.classList.remove('drag-over')
     const neueDateien = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-    if (neueDateien.length) fotoVorschauZeigen([...vorschauDateien, ...neueDateien])
+    if (neueDateien.length) { vorschauDateien = [...vorschauDateien, ...neueDateien]; renderFotoVorschau() }
   })
 
   // Form submit
