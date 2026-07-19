@@ -216,6 +216,33 @@ body {
 
 .btn-neu:active { transform: scale(.97); }
 
+.btn-login {
+  background: none;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: .45rem 1rem;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s, color .18s;
+}
+
+.btn-login:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-logout {
+  background: none;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: .45rem .9rem;
+  font-size: .8rem;
+  cursor: pointer;
+  transition: border-color .18s, color .18s;
+}
+
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
+
 /* ───────────────────────────────── INFO BAR ─── */
 .infoleiste {
   display: flex;
@@ -445,6 +472,10 @@ main {
   max-width: 520px;
   margin: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,.7);
+}
+
+.modal-klein {
+  max-width: 360px;
 }
 
 .modal-header {

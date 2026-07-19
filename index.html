@@ -43,7 +43,9 @@
     </div>
 
     <div class="neuleiste">
-      <button id="neu-btn" class="btn-neu">＋ Neue Flasche</button>
+      <button id="neu-btn" class="btn-neu" style="display:none">＋ Neue Flasche</button>
+      <button id="login-btn" class="btn-login">🔐 Admin</button>
+      <button id="logout-btn" class="btn-logout" style="display:none" title="Abmelden">✕ Abmelden</button>
     </div>
 
   </div>
@@ -51,7 +53,7 @@
   <!-- ③ Info bar (scrolls away) -->
   <div class="infoleiste" id="infoleiste">
     <div class="info-links">
-      <button id="import-btn" class="btn-info">⬆ Import</button>
+      <button id="import-btn" class="btn-info" style="display:none">⬆ Import</button>
       <button id="export-btn" class="btn-info">⬇ Export</button>
       <input type="file" id="import-input" accept=".json" style="display:none">
     </div>
@@ -169,6 +171,30 @@
 
         <div class="form-alert" id="form-alert"></div>
 
+      </form>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div class="modal-overlay" id="login-overlay">
+    <div class="modal modal-klein">
+      <div class="modal-header">
+        <h2>Admin-Anmeldung</h2>
+        <button class="modal-close" id="login-close">✕</button>
+      </div>
+      <form id="login-form" class="modal-form" novalidate>
+        <div class="form-row">
+          <label>E-Mail</label>
+          <input type="email" id="login-email" autocomplete="email" spellcheck="false">
+        </div>
+        <div class="form-row">
+          <label>Passwort</label>
+          <input type="password" id="login-password" autocomplete="current-password">
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="login-submit" class="btn-primaer">Anmelden</button>
+        </div>
+        <div class="form-alert" id="login-alert"></div>
       </form>
     </div>
   </div>

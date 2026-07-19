@@ -15,6 +15,26 @@ function esc(str) {
     .replace(/"/g, '&quot;')
 }
 
+// ─── Auth UI ─────────────────────────────────────────────────────────────────
+function updateAuthUI(user) {
+  const eingeloggt = !!user
+  document.getElementById('neu-btn').style.display     = eingeloggt ? '' : 'none'
+  document.getElementById('login-btn').style.display   = eingeloggt ? 'none' : ''
+  document.getElementById('logout-btn').style.display  = eingeloggt ? '' : 'none'
+  document.getElementById('import-btn').style.display  = eingeloggt ? '' : 'none'
+}
+
+function loginModalOeffnen() {
+  document.getElementById('login-overlay').classList.add('offen')
+  document.getElementById('login-email').focus()
+}
+
+function loginModalSchliessen() {
+  document.getElementById('login-overlay').classList.remove('offen')
+  document.getElementById('login-form').reset()
+  document.getElementById('login-alert').textContent = ''
+}
+
 // ─── Status bar ───────────────────────────────────────────────────────────────
 function statusSetzen(text, typ = '') {
   const el = document.getElementById('status-text')
@@ -258,6 +278,44 @@ function formAlertSetzen(text, typ) {
   el.className   = 'form-alert ' + typ
 }
 
+// ─── Auth events ─────────────────────────────────────────────────────────────
+function initAuthEvents() {
+  document.getElementById('login-btn').addEventListener('click', loginModalOeffnen)
+  document.getElementById('login-close').addEventListener('click', loginModalSchliessen)
+  document.getElementById('login-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) loginModalSchliessen()
+  })
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await client.auth.signOut()
+    statusSetzen('Abgemeldet', '')
+  })
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault()
+    const btn   = document.getElementById('login-submit')
+    const alert = document.getElementById('login-alert')
+    const email = document.getElementById('login-email').value.trim()
+    const pass  = document.getElementById('login-password').value
+
+    btn.disabled    = true
+    btn.textContent = 'Anmelden…'
+    alert.textContent = ''
+
+    const { error } = await client.auth.signInWithPassword({ email, password: pass })
+
+    if (error) {
+      alert.textContent = 'Falsche E-Mail oder Passwort.'
+      alert.className   = 'form-alert err'
+      btn.disabled      = false
+      btn.textContent   = 'Anmelden'
+    } else {
+      loginModalSchliessen()
+      statusSetzen('✓ Angemeldet', 'ok')
+    }
+  })
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 function initEvents() {
   // Search
@@ -373,8 +431,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('flaschen-grid').innerHTML =
     '<div class="lade-container"><div class="leer-icon">🍾</div><div class="spinner"></div></div>'
 
+  // Auth state listener
+  client.auth.onAuthStateChange((_event, session) => {
+    updateAuthUI(session?.user ?? null)
+  })
+
+  // Check current session
+  const { data: { session } } = await client.auth.getSession()
+  updateAuthUI(session?.user ?? null)
+
   await ladeFlaschen()
   renderKategorien()
   renderFlaschen()
+  initAuthEvents()
   initEvents()
 })
