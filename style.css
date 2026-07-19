@@ -577,6 +577,60 @@ main { padding: 1px; }
   color: var(--amber);
 }
 
+/* ── Camera button (admin only) ── */
+.admin-foto-btn {
+  display: none;
+  position: absolute;
+  bottom: 8px; right: 8px;
+  z-index: 10;
+  background: var(--amber);
+  border: none;
+  border-radius: var(--r-sm);
+  color: #fff;
+  font-size: 14px;
+  padding: 5px 10px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .04em;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  transition: background .15s, transform .1s;
+}
+.admin-foto-btn::after {
+  content: ' Foto';
+}
+
+.admin .flasche-karte:hover .admin-foto-btn {
+  display: flex;
+}
+
+.admin-foto-btn:hover {
+  background: var(--amber-2);
+  transform: translateY(-1px);
+}
+
+/* For ohne-bild cards, always show camera btn (not just hover) */
+.admin .ohne-bild .admin-foto-btn {
+  display: flex;
+  bottom: auto;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+  font-size: 18px;
+  padding: 10px 16px;
+}
+.admin .ohne-bild .admin-foto-btn::after {
+  content: ' Foto hinzufügen';
+  font-size: 12px;
+}
+.admin .ohne-bild .admin-foto-btn:hover {
+  transform: translate(50%, calc(-50% - 2px));
+}
+
 /* ── Multi-photo badge ── */
 .foto-anzahl {
   position: absolute;

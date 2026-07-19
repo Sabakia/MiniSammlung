@@ -181,7 +181,8 @@ function karteHTML(f) {
     f.hinzugefuegt   ? `<p class="karte-datum">${esc(f.hinzugefuegt)}</p>`        : '',
   ].filter(Boolean).join('')
 
-  const editBtn = `<button class="edit-btn" data-id="${esc(f.id)}" title="Bearbeiten">✎</button>`
+  const editBtn   = `<button class="edit-btn" data-id="${esc(f.id)}" title="Bearbeiten">✎</button>`
+  const fotoBtn   = `<button class="admin-foto-btn" data-id="${esc(f.id)}" title="Foto hochladen">📷</button>`
 
   if (bilder.length > 0) {
     const fotoBadge = bilder.length > 1
@@ -194,6 +195,7 @@ function karteHTML(f) {
         <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
         ${fotoBadge}
         ${editBtn}
+        ${fotoBtn}
         <div class="karte-overlay">
           <span class="karte-kat">${esc(f.kategorie)}</span>
           <h3 class="karte-name">${esc(f.name)}</h3>
@@ -209,6 +211,7 @@ function karteHTML(f) {
     <div class="karte-kein-bild" data-kat="${esc(f.kategorie)}">
       <div class="karte-inner-border"></div>
       ${editBtn}
+      ${fotoBtn}
       <span class="karte-kat">${esc(f.kategorie)}</span>
       <h3 class="karte-name">${esc(f.name)}</h3>
       ${metaZeile ? `<div class="karte-meta-zeile">${metaZeile}</div>` : ''}
@@ -279,7 +282,7 @@ async function flascheAktualisieren(id, daten, dateien) {
 }
 
 // ─── Open edit modal prefilled ────────────────────────────────────────────────
-function flascheBearbeiten(id) {
+function flascheBearbeiten(id, fotoPickerOeffnen = false) {
   const f = alleFlaschen.find(f => String(f.id) === String(id))
   if (!f) return
 
@@ -321,7 +324,11 @@ function flascheBearbeiten(id) {
   if (urls.length === 0 && f.bild_url) urls = [f.bild_url]
   fotoVorschauUrls(urls)
 
-  document.getElementById('f-name').focus()
+  if (fotoPickerOeffnen) {
+    setTimeout(() => document.getElementById('f-foto').click(), 150)
+  } else {
+    document.getElementById('f-name').focus()
+  }
 }
 
 // ─── Export as JSON ───────────────────────────────────────────────────────────
@@ -620,6 +627,14 @@ document.addEventListener('click', e => {
   if (!btn) return
   e.stopPropagation()
   flascheBearbeiten(btn.dataset.id)
+})
+
+// ─── Camera button click → edit + auto-open file picker ──────────────────────
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.admin-foto-btn')
+  if (!btn) return
+  e.stopPropagation()
+  flascheBearbeiten(btn.dataset.id, true)
 })
 
 // ─── Card click → detail modal ────────────────────────────────────────────────
