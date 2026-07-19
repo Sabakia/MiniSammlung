@@ -120,9 +120,12 @@ function renderFlaschen() {
 }
 
 function karteHTML(f) {
-  const bilder = (f.bild_urls && f.bild_urls.length > 0)
-    ? f.bild_urls
-    : (f.bild_url ? [f.bild_url] : [])
+  let _urls = []
+  if (f.bild_urls) {
+    try { _urls = JSON.parse(f.bild_urls) } catch { _urls = [] }
+  }
+  if (_urls.length === 0 && f.bild_url) _urls = [f.bild_url]
+  const bilder = _urls
 
   let bildEl = ''
   if (bilder.length > 0) {

@@ -36,8 +36,8 @@ foreach ($prop in $json.data.PSObject.Properties) {
             destillerie     = if ($f.distillery -and "$($f.distillery)".Trim()) { "$($f.distillery)".Trim() }    else { $null }
             hergestellt_in  = if ($f.country -and "$($f.country)".Trim())       { "$($f.country)".Trim() }       else { $null }
             notiz           = if ($f.note -and "$($f.note)".Trim())             { "$($f.note)".Trim() }          else { $null }
-            bild_url        = if ($alleUrls.Count -gt 0)                        { $alleUrls[0] }                 else { $null }
-            bild_urls       = if ($alleUrls.Count -gt 0)                        { $alleUrls }                    else { $null }
+            bild_url        = if ($alleUrls.Count -gt 0) { $alleUrls[0] } else { $null }
+            bild_urls       = if ($alleUrls.Count -gt 0) { ConvertTo-Json -InputObject @($alleUrls) -Compress } else { $null }
         }
         $alle += $eintrag
     }
