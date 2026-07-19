@@ -25,8 +25,8 @@ function updateAuthUI(user) {
   document.getElementById('login-btn').style.display   = eingeloggt ? 'none' : ''
   document.getElementById('logout-btn').style.display  = eingeloggt ? '' : 'none'
   document.getElementById('import-btn').style.display  = eingeloggt ? '' : 'none'
-  const heroBtn = document.getElementById('hero-foto-btn')
-  if (heroBtn) heroBtn.style.display = eingeloggt ? '' : 'none'
+  const heroMenue = document.getElementById('hero-menue')
+  if (heroMenue) heroMenue.style.display = eingeloggt ? '' : 'none'
   document.body.classList.toggle('admin', eingeloggt)
 }
 
@@ -636,8 +636,19 @@ function initEvents() {
   // Export
   document.getElementById('export-btn').addEventListener('click', exportDaten)
 
+  // Hero three-dot menu (admin)
+  const heroMenue = document.getElementById('hero-menue')
+  document.getElementById('hero-menue-btn').addEventListener('click', e => {
+    e.stopPropagation()
+    heroMenue.classList.toggle('offen')
+  })
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.hero-menue')) heroMenue.classList.remove('offen')
+  })
+
   // Hero title image (admin)
   document.getElementById('hero-foto-btn').addEventListener('click', () => {
+    heroMenue.classList.remove('offen')
     document.getElementById('hero-foto-input').click()
   })
   document.getElementById('hero-foto-input').addEventListener('change', e => {
