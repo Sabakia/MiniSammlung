@@ -80,12 +80,53 @@ body {
   pointer-events: none;
 }
 
+/* Uploaded hero/title image — sits above gradient, below grain + fades */
+.hero-bild {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.hero-bild.geladen { display: block; }
+
+/* Darken image slightly so the title stays readable */
+.hero-bild.geladen + .fade-bottom {
+  height: 70%;
+  background: linear-gradient(to top, var(--ink) 0%, rgba(12,10,7,.35) 60%, transparent 100%);
+}
+
 .fade-bottom {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   height: 55%;
   background: linear-gradient(to top, var(--ink) 0%, transparent 100%);
   z-index: 2;
+}
+
+/* Admin: change title image */
+.hero-foto-btn {
+  position: absolute;
+  top: 16px; right: 16px;
+  z-index: 5;
+  background: rgba(12,10,7,.75);
+  border: 1px solid var(--amber);
+  border-radius: var(--r-sm);
+  color: var(--amber-2);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 8px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background .15s, color .15s;
+}
+.hero-foto-btn:hover {
+  background: var(--amber);
+  color: #fff;
 }
 
 .galerie-overlay {

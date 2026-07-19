@@ -25,6 +25,8 @@ function updateAuthUI(user) {
   document.getElementById('login-btn').style.display   = eingeloggt ? 'none' : ''
   document.getElementById('logout-btn').style.display  = eingeloggt ? '' : 'none'
   document.getElementById('import-btn').style.display  = eingeloggt ? '' : 'none'
+  const heroBtn = document.getElementById('hero-foto-btn')
+  if (heroBtn) heroBtn.style.display = eingeloggt ? '' : 'none'
   document.body.classList.toggle('admin', eingeloggt)
 }
 
@@ -240,6 +242,31 @@ function fuelleDatalist() {
       '<option value="__neu__">＋ Neue Kategorie…</option>'
     if (vorheriger && kats.includes(vorheriger)) select.value = vorheriger
   }
+}
+
+// ─── Hero / title image ───────────────────────────────────────────────────────
+const TITELBILD_DATEI = 'titelbild'
+
+function ladeTitelbild() {
+  const img = document.getElementById('hero-bild')
+  if (!img) return
+  const url = client.storage.from('SammlungBilder').getPublicUrl(TITELBILD_DATEI).data.publicUrl
+  img.onload  = () => img.classList.add('geladen')
+  img.onerror = () => img.classList.remove('geladen')
+  img.src = url + '?v=' + Date.now()
+}
+
+async function titelbildHochladen(datei) {
+  statusSetzen('Titelbild wird hochgeladen…')
+  const { error } = await client.storage
+    .from('SammlungBilder')
+    .upload(TITELBILD_DATEI, datei, { upsert: true, contentType: datei.type, cacheControl: '3600' })
+  if (error) {
+    statusSetzen('Fehler beim Titelbild: ' + error.message, 'err')
+    return
+  }
+  statusSetzen('✓ Titelbild gespeichert', 'ok')
+  ladeTitelbild()
 }
 
 // ─── Upload one image, return public URL ─────────────────────────────────────
@@ -609,6 +636,16 @@ function initEvents() {
   // Export
   document.getElementById('export-btn').addEventListener('click', exportDaten)
 
+  // Hero title image (admin)
+  document.getElementById('hero-foto-btn').addEventListener('click', () => {
+    document.getElementById('hero-foto-input').click()
+  })
+  document.getElementById('hero-foto-input').addEventListener('change', e => {
+    const datei = e.target.files[0]
+    if (datei) titelbildHochladen(datei)
+    e.target.value = ''
+  })
+
   // Import
   document.getElementById('import-btn').addEventListener('click', () => {
     document.getElementById('import-input').click()
@@ -710,6 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { data: { session } } = await client.auth.getSession()
   updateAuthUI(session?.user ?? null)
 
+  ladeTitelbild()
   await ladeFlaschen()
   renderKategorien()
   renderFlaschen()
