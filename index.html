@@ -93,12 +93,14 @@
 
         <div class="form-row">
           <label>Kategorie <span style="color:#c9a227">*</span></label>
-          <input type="text" id="f-kategorie" list="kat-list"
-            placeholder="z. B. Whisky, Rum, Gin …"
-            autocomplete="off" autocorrect="off"
-            autocapitalize="off" spellcheck="false"
-            required>
-          <datalist id="kat-list"></datalist>
+          <select id="f-kategorie-select">
+            <option value="">– wählen –</option>
+            <option value="__neu__">＋ Neue Kategorie…</option>
+          </select>
+          <input type="text" id="f-kategorie-neu"
+            placeholder="Neue Kategorie eingeben…"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+            style="display:none; margin-top:6px;">
         </div>
 
         <div class="form-row">
@@ -153,6 +155,13 @@
           <input type="text" id="f-hergestellt"
             placeholder="z. B. Schottland, Jamaika …"
             spellcheck="true">
+        </div>
+
+        <div class="form-row">
+          <label>Notiz <span class="hint">(optional)</span></label>
+          <textarea id="f-notiz" rows="3"
+            placeholder="z. B. Geschenk von …, Erinnerung, besondere Herkunft …"
+            spellcheck="true"></textarea>
         </div>
 
         <div class="form-row">

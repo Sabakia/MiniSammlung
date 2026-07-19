@@ -779,8 +779,15 @@ main { padding: 1px; }
   color: var(--dim);
 }
 
+.form-row textarea {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.5;
+}
+
 .form-row input,
-.form-row select {
+.form-row select,
+.form-row textarea {
   background: var(--s3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -794,7 +801,8 @@ main { padding: 1px; }
 }
 
 .form-row input:focus,
-.form-row select:focus {
+.form-row select:focus,
+.form-row textarea:focus {
   border-color: var(--amber);
   background: var(--s2);
 }

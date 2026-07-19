@@ -5,7 +5,8 @@ let alleFlaschen     = []
 let aktiveKategorie  = 'alle'
 let suchbegriff      = ''
 let bearbeitungsId   = null   // null = neue Flasche; ID = Bearbeiten-Modus
-let vorschauDateien  = []     // FileList-Kopie für mehrere Fotos
+let vorschauDateien  = []     // neue Dateien zum Hochladen
+let behalteneUrls    = []     // bestehende URLs die beim Bearbeiten behalten werden
 
 // ─── HTML escaping ────────────────────────────────────────────────────────────
 function esc(str) {
@@ -82,11 +83,16 @@ function suchMatch(f, q) {
 
 function gefilterteFlaschen() {
   const q = suchbegriff.toLowerCase()
-  return alleFlaschen.filter(f => {
+  const liste = alleFlaschen.filter(f => {
     const katOk = aktiveKategorie === 'alle' || f.kategorie === aktiveKategorie
     if (!katOk) return false
     if (!q) return true
     return suchMatch(f, q)
+  })
+  return liste.sort((a, b) => {
+    const k = (a.kategorie || '').localeCompare(b.kategorie || '', 'de')
+    if (k !== 0) return k
+    return (a.name || '').localeCompare(b.name || '', 'de')
   })
 }
 
@@ -211,18 +217,26 @@ function karteHTML(f) {
   </article>`
 }
 
-// ─── Populate datalists (categories + sizes) ──────────────────────────────────
+// ─── Populate category select + ml datalist ───────────────────────────────────
 function fuelleDatalist() {
-  const katList = document.getElementById('kat-list')
-  const mlList  = document.getElementById('ml-list')
-  if (!katList || !mlList) return
+  const mlList = document.getElementById('ml-list')
+  const select = document.getElementById('f-kategorie-select')
 
-  const kats    = [...new Set(alleFlaschen.map(f => f.kategorie).filter(Boolean))].sort()
+  const kats = [...new Set(alleFlaschen.map(f => f.kategorie).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'de'))
   const groessen = [...new Set(alleFlaschen.map(f => f.groesse_ml).filter(Boolean))]
     .sort((a, b) => parseFloat(a) - parseFloat(b))
 
-  katList.innerHTML = kats.map(k => `<option value="${esc(k)}">`).join('')
-  mlList.innerHTML  = groessen.map(g => `<option value="${esc(g)}">`).join('')
+  if (mlList) mlList.innerHTML = groessen.map(g => `<option value="${esc(g)}">`).join('')
+
+  if (select) {
+    const vorheriger = select.value
+    select.innerHTML =
+      '<option value="">– wählen –</option>' +
+      kats.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('') +
+      '<option value="__neu__">＋ Neue Kategorie…</option>'
+    if (vorheriger && kats.includes(vorheriger)) select.value = vorheriger
+  }
 }
 
 // ─── Upload one image, return public URL ─────────────────────────────────────
@@ -253,20 +267,12 @@ async function flascheSpeichern(daten, dateien) {
 
 // ─── Update existing bottle ───────────────────────────────────────────────────
 async function flascheAktualisieren(id, daten, dateien) {
-  if (dateien.length > 0) {
-    // Keep existing photos, append new ones
-    const alteF = alleFlaschen.find(f => f.id === id)
-    let alleUrls = []
-    if (alteF?.bild_urls) { try { alleUrls = JSON.parse(alteF.bild_urls) } catch { alleUrls = [] } }
-    if (alleUrls.length === 0 && alteF?.bild_url) alleUrls = [alteF.bild_url]
+  const neueUrls = []
+  for (const datei of dateien) neueUrls.push(await bildHochladen(datei))
 
-    for (const datei of dateien) {
-      alleUrls.push(await bildHochladen(datei))
-    }
-
-    daten.bild_url  = alleUrls[0]
-    daten.bild_urls = alleUrls.length > 1 ? JSON.stringify(alleUrls) : null
-  }
+  const alleUrls = [...behalteneUrls, ...neueUrls]
+  daten.bild_url  = alleUrls[0] || null
+  daten.bild_urls = alleUrls.length > 1 ? JSON.stringify(alleUrls) : null
 
   const { error } = await client.from('flaschen').update(daten).eq('id', id)
   if (error) throw new Error(error.message)
@@ -274,31 +280,45 @@ async function flascheAktualisieren(id, daten, dateien) {
 
 // ─── Open edit modal prefilled ────────────────────────────────────────────────
 function flascheBearbeiten(id) {
-  const f = alleFlaschen.find(f => f.id === id)
+  const f = alleFlaschen.find(f => String(f.id) === String(id))
   if (!f) return
 
-  bearbeitungsId = id
+  bearbeitungsId  = id
+  vorschauDateien = []
   fuelleDatalist()
 
   document.getElementById('modal-overlay').classList.add('offen')
   document.querySelector('#modal-overlay .modal-header h2').textContent = 'Flasche bearbeiten'
   document.getElementById('form-speichern').textContent = 'Aktualisieren'
 
-  document.getElementById('f-name').value         = f.name          || ''
-  document.getElementById('f-kategorie').value    = f.kategorie     || ''
-  document.getElementById('f-groesse').value      = f.groesse_ml    || ''
-  document.getElementById('f-alkohol').value      = f.alkohol_vol   || ''
-  document.getElementById('f-material').value     = f.material      || ''
-  document.getElementById('f-hinzugefuegt').value = f.hinzugefuegt  || ''
-  document.getElementById('f-geschmack').value    = f.geschmack     || ''
-  document.getElementById('f-destillerie').value  = f.destillerie   || ''
+  document.getElementById('f-name').value         = f.name           || ''
+  document.getElementById('f-groesse').value      = f.groesse_ml     || ''
+  document.getElementById('f-alkohol').value      = f.alkohol_vol    || ''
+  document.getElementById('f-material').value     = f.material       || ''
+  document.getElementById('f-hinzugefuegt').value = f.hinzugefuegt   || ''
+  document.getElementById('f-geschmack').value    = f.geschmack      || ''
+  document.getElementById('f-destillerie').value  = f.destillerie    || ''
   document.getElementById('f-hergestellt').value  = f.hergestellt_in || ''
+  document.getElementById('f-notiz').value        = f.notiz          || ''
 
-  // Show existing photos
+  // Set category select
+  const katSelect = document.getElementById('f-kategorie-select')
+  const katNeu    = document.getElementById('f-kategorie-neu')
+  const katOpts   = Array.from(katSelect.options).map(o => o.value)
+  if (katOpts.includes(f.kategorie)) {
+    katSelect.value        = f.kategorie || ''
+    katNeu.style.display   = 'none'
+    katNeu.value           = ''
+  } else if (f.kategorie) {
+    katSelect.value        = '__neu__'
+    katNeu.value           = f.kategorie
+    katNeu.style.display   = ''
+  }
+
+  // Show existing photos with remove buttons
   let urls = []
   if (f.bild_urls) { try { urls = JSON.parse(f.bild_urls) } catch { urls = [] } }
   if (urls.length === 0 && f.bild_url) urls = [f.bild_url]
-  vorschauDateien = []
   fotoVorschauUrls(urls)
 
   document.getElementById('f-name').focus()
@@ -357,9 +377,12 @@ function modalSchliessen() {
   document.getElementById('foto-vorschau').innerHTML = ''
   document.querySelector('#modal-overlay .modal-header h2').textContent = 'Neue Flasche'
   document.getElementById('form-speichern').textContent = 'Speichern'
+  document.getElementById('f-kategorie-neu').style.display = 'none'
+  document.getElementById('f-kategorie-neu').value = ''
   formAlertSetzen('', '')
   bearbeitungsId  = null
   vorschauDateien = []
+  behalteneUrls   = []
 }
 
 function formAlertSetzen(text, typ) {
@@ -398,10 +421,31 @@ function fotoVorschauZeigen(dateien) {
 }
 
 function fotoVorschauUrls(urls) {
+  behalteneUrls = [...urls]
   const grid = document.getElementById('foto-vorschau')
-  grid.innerHTML = urls.map(u =>
-    `<div class="foto-vorschau-item"><img src="${esc(u)}" loading="lazy"></div>`
-  ).join('')
+  grid.innerHTML = ''
+
+  urls.forEach((url, i) => {
+    const item = document.createElement('div')
+    item.className = 'foto-vorschau-item'
+
+    const img = document.createElement('img')
+    img.src     = url
+    img.loading = 'lazy'
+
+    const btn = document.createElement('button')
+    btn.className   = 'remove-foto'
+    btn.type        = 'button'
+    btn.textContent = '✕'
+    btn.addEventListener('click', () => {
+      behalteneUrls = behalteneUrls.filter((_, idx) => idx !== i)
+      fotoVorschauUrls(behalteneUrls)
+    })
+
+    item.appendChild(img)
+    item.appendChild(btn)
+    grid.appendChild(item)
+  })
 }
 
 // ─── Auth events ─────────────────────────────────────────────────────────────
@@ -469,9 +513,22 @@ function initEvents() {
     if (e.target === e.currentTarget) modalSchliessen()
   })
 
-  // Image preview — multiple files
+  // Image preview — append multiple files
   document.getElementById('f-foto').addEventListener('change', e => {
-    fotoVorschauZeigen(Array.from(e.target.files))
+    fotoVorschauZeigen([...vorschauDateien, ...Array.from(e.target.files)])
+    e.target.value = ''
+  })
+
+  // Category select → show/hide new input
+  document.getElementById('f-kategorie-select').addEventListener('change', e => {
+    const neuInput = document.getElementById('f-kategorie-neu')
+    if (e.target.value === '__neu__') {
+      neuInput.style.display = ''
+      neuInput.focus()
+    } else {
+      neuInput.style.display = 'none'
+      neuInput.value = ''
+    }
   })
 
   // Image drag & drop
@@ -491,8 +548,12 @@ function initEvents() {
     const speichern = document.getElementById('form-speichern')
     formAlertSetzen('', '')
 
-    const name = document.getElementById('f-name').value.trim()
-    const kat  = document.getElementById('f-kategorie').value.trim()
+    const name      = document.getElementById('f-name').value.trim()
+    const katSelect = document.getElementById('f-kategorie-select')
+    const katNeu    = document.getElementById('f-kategorie-neu')
+    const kat       = katSelect.value === '__neu__'
+      ? katNeu.value.trim()
+      : katSelect.value
 
     if (!name) { formAlertSetzen('Name ist erforderlich.', 'err'); return }
     if (!kat)  { formAlertSetzen('Kategorie ist erforderlich.', 'err'); return }
@@ -510,6 +571,7 @@ function initEvents() {
       geschmack:      document.getElementById('f-geschmack').value.trim()    || null,
       destillerie:    document.getElementById('f-destillerie').value.trim()  || null,
       hergestellt_in: document.getElementById('f-hergestellt').value.trim()  || null,
+      notiz:          document.getElementById('f-notiz').value.trim()        || null,
     }
     try {
       if (bearbeitungsId) {
