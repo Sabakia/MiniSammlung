@@ -498,12 +498,12 @@ function initEvents() {
   })
 
   // Detail modal close
+  const detailOverlay = document.getElementById('detail-overlay')
   document.getElementById('detail-close').addEventListener('click', () => {
-    document.getElementById('detail-overlay').classList.remove('offen')
+    detailOverlay.classList.remove('offen')
   })
-  document.getElementById('detail-overlay').addEventListener('click', e => {
-    if (e.target === e.currentTarget)
-      document.getElementById('detail-overlay').classList.remove('offen')
+  detailOverlay.addEventListener('click', e => {
+    if (e.target === e.currentTarget) detailOverlay.classList.remove('offen')
   })
 
   // Sticky header scroll class
@@ -548,6 +548,14 @@ document.addEventListener('click', e => {
 function detailOeffnen(id) {
   const f = alleFlaschen.find(f => String(f.id) === String(id))
   if (!f) return
+
+  // Show edit button only for admins
+  const editBtn = document.getElementById('detail-edit-btn')
+  editBtn.style.display = document.body.classList.contains('admin') ? '' : 'none'
+  editBtn.onclick = () => {
+    document.getElementById('detail-overlay').classList.remove('offen')
+    flascheBearbeiten(id)
+  }
 
   let urls = []
   if (f.bild_urls) { try { urls = JSON.parse(f.bild_urls) } catch { urls = [] } }
