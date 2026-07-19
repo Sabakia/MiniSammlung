@@ -73,16 +73,20 @@ function updateGesamtAnzahl() {
 }
 
 // ─── Filter ───────────────────────────────────────────────────────────────────
+function suchMatch(f, q) {
+  return [f.name, f.kategorie, f.groesse_ml, f.alkohol_vol,
+          f.material, f.hinzugefuegt, f.geschmack,
+          f.destillerie, f.hergestellt_in, f.notiz]
+    .some(v => v && v.toString().toLowerCase().includes(q))
+}
+
 function gefilterteFlaschen() {
   const q = suchbegriff.toLowerCase()
   return alleFlaschen.filter(f => {
     const katOk = aktiveKategorie === 'alle' || f.kategorie === aktiveKategorie
     if (!katOk) return false
     if (!q) return true
-    return [f.name, f.kategorie, f.groesse_ml, f.alkohol_vol,
-            f.material, f.hinzugefuegt, f.geschmack,
-            f.destillerie, f.hergestellt_in]
-      .some(v => v && v.toString().toLowerCase().includes(q))
+    return suchMatch(f, q)
   })
 }
 
@@ -91,8 +95,15 @@ function renderKategorien() {
   const el = document.getElementById('kategorieleiste')
   if (!el) return
 
+  const q = suchbegriff.toLowerCase()
+
+  // Count per category respecting current search (but not category filter)
   const zaehler = {}
-  alleFlaschen.forEach(f => {
+  const basis = q
+    ? alleFlaschen.filter(f => suchMatch(f, q))
+    : alleFlaschen
+
+  basis.forEach(f => {
     if (f.kategorie) zaehler[f.kategorie] = (zaehler[f.kategorie] || 0) + 1
   })
 
@@ -100,7 +111,7 @@ function renderKategorien() {
     .sort(([a], [b]) => a.localeCompare(b, 'de'))
 
   const pills = [
-    kategorieHTML('alle', alleFlaschen.length),
+    kategorieHTML('alle', basis.length),
     ...sortiertKats.map(([k, c]) => kategorieHTML(k, c))
   ].join('')
 
@@ -436,6 +447,15 @@ function initEvents() {
   // Search
   document.getElementById('suche').addEventListener('input', e => {
     suchbegriff = e.target.value.trim()
+    // If active category has no results with new search, reset to 'alle'
+    if (aktiveKategorie !== 'alle') {
+      const q = suchbegriff.toLowerCase()
+      const hatTreffer = q
+        ? alleFlaschen.some(f => f.kategorie === aktiveKategorie && suchMatch(f, q))
+        : true
+      if (!hatTreffer) aktiveKategorie = 'alle'
+    }
+    renderKategorien()
     renderFlaschen()
   })
 
