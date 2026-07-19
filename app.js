@@ -167,12 +167,12 @@ async function flascheSpeichern(daten, bildDatei) {
     const sicherName = bildDatei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const dateiname  = `${Date.now()}-${sicherName}`
     const { error: uploadFehler } = await client.storage
-      .from('bilder')
+      .from('SammlungBilder')
       .upload(dateiname, bildDatei)
 
     if (uploadFehler) throw new Error('Bild-Upload: ' + uploadFehler.message)
 
-    const { data: urlDaten } = client.storage.from('bilder').getPublicUrl(dateiname)
+    const { data: urlDaten } = client.storage.from('SammlungBilder').getPublicUrl(dateiname)
     bildUrl = urlDaten.publicUrl
   }
 
