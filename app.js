@@ -120,9 +120,22 @@ function renderFlaschen() {
 }
 
 function karteHTML(f) {
-  const bildEl = f.bild_url
-    ? `<img src="${esc(f.bild_url)}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">`
-    : ''
+  const bilder = (f.bild_urls && f.bild_urls.length > 0)
+    ? f.bild_urls
+    : (f.bild_url ? [f.bild_url] : [])
+
+  let bildEl = ''
+  if (bilder.length > 0) {
+    const thumbs = bilder.length > 1
+      ? `<div class="karte-thumbs">${bilder.map((u, i) =>
+          `<img src="${esc(u)}" class="karte-thumb${i === 0 ? ' aktiv' : ''}" loading="lazy" data-idx="${i}">`
+        ).join('')}</div>`
+      : ''
+    bildEl = `<div class="karte-galerie" data-bilder='${JSON.stringify(bilder)}'>
+      <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
+      ${thumbs}
+    </div>`
+  }
 
   const infos = [
     f.groesse_ml  ? `<span>🍶 ${esc(f.groesse_ml)} ml</span>` : '',
@@ -137,10 +150,11 @@ function karteHTML(f) {
       <span class="karte-kat">${esc(f.kategorie)}</span>
       <h3 class="karte-name">${esc(f.name)}</h3>
       ${infos ? `<div class="karte-infos">${infos}</div>` : ''}
-      ${f.geschmack     ? `<p class="karte-geschmack">🍫 ${esc(f.geschmack)}</p>` : ''}
-      ${f.destillerie   ? `<p class="karte-meta">🏭 ${esc(f.destillerie)}</p>` : ''}
+      ${f.geschmack      ? `<p class="karte-geschmack">🍫 ${esc(f.geschmack)}</p>` : ''}
+      ${f.destillerie    ? `<p class="karte-meta">🏭 ${esc(f.destillerie)}</p>` : ''}
       ${f.hergestellt_in ? `<p class="karte-meta">🌍 ${esc(f.hergestellt_in)}</p>` : ''}
-      ${f.hinzugefuegt  ? `<p class="karte-datum">📅 ${esc(f.hinzugefuegt)}</p>` : ''}
+      ${f.hinzugefuegt   ? `<p class="karte-datum">📅 ${esc(f.hinzugefuegt)}</p>` : ''}
+      ${f.notiz          ? `<p class="karte-notiz">💬 ${esc(f.notiz)}</p>` : ''}
     </div>
   </article>`
 }
@@ -338,6 +352,18 @@ function initEvents() {
     e.target.value = ''
   })
 }
+
+// ─── Thumbnail gallery click ─────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const thumb = e.target.closest('.karte-thumb')
+  if (!thumb) return
+  const galerie = thumb.closest('.karte-galerie')
+  if (!galerie) return
+  const hauptbild = galerie.querySelector('.karte-bild')
+  hauptbild.src = thumb.src
+  galerie.querySelectorAll('.karte-thumb').forEach(t => t.classList.remove('aktiv'))
+  thumb.classList.add('aktiv')
+})
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
