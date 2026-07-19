@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini-Mini-Bar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ① Gallery hero (scrolls away) -->
+  <div class="galerie-hero" id="galerie-hero">
+    <div class="galerie-overlay">
+      <span class="galerie-name">Mini-Mini-Bar</span>
+      <span class="galerie-count" id="gesamt-anzahl">
+        <strong>—</strong> Flaschen
+      </span>
+    </div>
+  </div>
+
+  <!-- ② Sticky header: search + categories + new button -->
+  <div class="sticky-header" id="sticky-header">
+
+    <div class="suchleiste">
+      <div class="such-wrapper">
+        <span class="such-icon">🔍</span>
+        <input
+          type="search"
+          id="suche"
+          placeholder="Suchen…"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+        >
+      </div>
+    </div>
+
+    <div class="kategorieleiste" id="kategorieleiste">
+      <!-- rendered by JS -->
+    </div>
+
+    <div class="neuleiste">
+      <button id="neu-btn" class="btn-neu">＋ Neue Flasche</button>
+    </div>
+
+  </div>
+
+  <!-- ③ Info bar (scrolls away) -->
+  <div class="infoleiste" id="infoleiste">
+    <div class="info-links">
+      <button id="import-btn" class="btn-info">⬆ Import</button>
+      <button id="export-btn" class="btn-info">⬇ Export</button>
+      <input type="file" id="import-input" accept=".json" style="display:none">
+    </div>
+    <div class="info-status" id="status-text">Bereit</div>
+  </div>
+
+  <!-- ④ Bottle grid -->
+  <main>
+    <div class="flaschen-grid" id="flaschen-grid"></div>
+    <div class="leer-state" id="leer-state" style="display:none; flex-direction:column; align-items:center;">
+      <div class="leer-icon">🍾</div>
+      <p>Noch keine Flaschen. Füge deine erste hinzu!</p>
+    </div>
+  </main>
+
+  <!-- ⑤ Modal: new bottle form -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+
+      <div class="modal-header">
+        <h2>Neue Flasche</h2>
+        <button class="modal-close" id="modal-close" aria-label="Schließen">✕</button>
+      </div>
+
+      <form id="flasche-form" class="modal-form" novalidate>
+
+        <div class="form-row">
+          <label>Name <span style="color:#c9a227">*</span></label>
+          <input type="text" id="f-name"
+            placeholder="z. B. Jack Daniel's No. 7"
+            autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false"
+            required>
+        </div>
+
+        <div class="form-row">
+          <label>Kategorie <span style="color:#c9a227">*</span></label>
+          <input type="text" id="f-kategorie" list="kat-list"
+            placeholder="z. B. Whisky, Rum, Gin …"
+            autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false"
+            required>
+          <datalist id="kat-list"></datalist>
+        </div>
+
+        <div class="form-row">
+          <label>Größe (ml) <span class="hint">(optional)</span></label>
+          <input type="text" id="f-groesse" list="ml-list"
+            placeholder="z. B. 50, 200, 700 …"
+            autocomplete="off" spellcheck="false">
+          <datalist id="ml-list"></datalist>
+        </div>
+
+        <div class="form-row">
+          <label>Alkohol (% Vol) <span class="hint">(optional)</span></label>
+          <input type="text" id="f-alkohol"
+            placeholder="z. B. 40"
+            autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="form-row">
+          <label>Material <span class="hint">(optional)</span></label>
+          <select id="f-material">
+            <option value="">– wählen –</option>
+            <option>Glas</option>
+            <option>Plastik</option>
+            <option>Keramik</option>
+            <option>Metall</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label>Hinzugefügt <span class="hint">(optional)</span></label>
+          <input type="text" id="f-hinzugefuegt"
+            placeholder="z. B. 2024, Januar 2025 …"
+            autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="form-row">
+          <label>Geschmack <span class="hint">(optional)</span></label>
+          <input type="text" id="f-geschmack"
+            placeholder="z. B. rauchig, süß, fruchtig …"
+            spellcheck="true">
+        </div>
+
+        <div class="form-row">
+          <label>Destillerie <span class="hint">(optional)</span></label>
+          <input type="text" id="f-destillerie"
+            placeholder="Name der Destillerie"
+            spellcheck="true">
+        </div>
+
+        <div class="form-row">
+          <label>Hergestellt in <span class="hint">(optional)</span></label>
+          <input type="text" id="f-hergestellt"
+            placeholder="z. B. Schottland, Jamaika …"
+            spellcheck="true">
+        </div>
+
+        <div class="form-row">
+          <label>Foto <span class="hint">(optional · max. 5 MB)</span></label>
+          <div class="file-upload-area" id="foto-upload-area">
+            <input type="file" id="f-foto" accept="image/*">
+            <span>📷 Bild auswählen oder hierher ziehen</span>
+          </div>
+          <div id="foto-vorschau" style="display:none">
+            <img id="foto-vorschau-img" src="" alt="Vorschau">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="form-abbrechen" class="btn-sekundaer">Abbrechen</button>
+          <button type="submit" id="form-speichern" class="btn-primaer">Speichern</button>
+        </div>
+
+        <div class="form-alert" id="form-alert"></div>
+
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
