@@ -5,6 +5,7 @@ let alleFlaschen     = []
 let aktiveKategorie  = 'alle'
 let suchbegriff      = ''
 let bearbeitungsId   = null   // null = neue Flasche; ID = Bearbeiten-Modus
+let vorschauDateien  = []     // FileList-Kopie für mehrere Fotos
 
 // ─── HTML escaping ────────────────────────────────────────────────────────────
 function esc(str) {
@@ -213,52 +214,47 @@ function fuelleDatalist() {
   mlList.innerHTML  = groessen.map(g => `<option value="${esc(g)}">`).join('')
 }
 
+// ─── Upload one image, return public URL ─────────────────────────────────────
+async function bildHochladen(datei) {
+  const sicherName = datei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const dateiname  = `${Date.now()}-${Math.random().toString(36).slice(2)}-${sicherName}`
+  const { error } = await client.storage.from('SammlungBilder').upload(dateiname, datei)
+  if (error) throw new Error('Bild-Upload: ' + error.message)
+  return client.storage.from('SammlungBilder').getPublicUrl(dateiname).data.publicUrl
+}
+
 // ─── Save new bottle ──────────────────────────────────────────────────────────
-async function flascheSpeichern(daten, bildDatei) {
-  let bildUrl = null
-
-  if (bildDatei) {
-    const sicherName = bildDatei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const dateiname  = `${Date.now()}-${sicherName}`
-    const { error: uploadFehler } = await client.storage
-      .from('SammlungBilder')
-      .upload(dateiname, bildDatei)
-
-    if (uploadFehler) throw new Error('Bild-Upload: ' + uploadFehler.message)
-
-    const { data: urlDaten } = client.storage.from('SammlungBilder').getPublicUrl(dateiname)
-    bildUrl = urlDaten.publicUrl
+async function flascheSpeichern(daten, dateien) {
+  const urls = []
+  for (const datei of dateien) {
+    urls.push(await bildHochladen(datei))
   }
 
-  const { error } = await client.from('flaschen').insert({ ...daten, bild_url: bildUrl })
+  const eintrag = {
+    ...daten,
+    bild_url:  urls[0]  || null,
+    bild_urls: urls.length > 1 ? JSON.stringify(urls) : null,
+  }
+
+  const { error } = await client.from('flaschen').insert(eintrag)
   if (error) throw new Error(error.message)
 }
 
 // ─── Update existing bottle ───────────────────────────────────────────────────
-async function flascheAktualisieren(id, daten, bildDatei) {
-  if (bildDatei) {
-    const sicherName = bildDatei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const dateiname  = `${Date.now()}-${sicherName}`
-    const { error: uploadFehler } = await client.storage
-      .from('SammlungBilder')
-      .upload(dateiname, bildDatei)
-
-    if (uploadFehler) throw new Error('Bild-Upload: ' + uploadFehler.message)
-
-    const { data: urlDaten } = client.storage.from('SammlungBilder').getPublicUrl(dateiname)
-    const neueUrl = urlDaten.publicUrl
-
-    // Append new URL to existing bild_urls
-    const alteFlaschen = alleFlaschen.find(f => f.id === id)
+async function flascheAktualisieren(id, daten, dateien) {
+  if (dateien.length > 0) {
+    // Keep existing photos, append new ones
+    const alteF = alleFlaschen.find(f => f.id === id)
     let alleUrls = []
-    if (alteFlaschen?.bild_urls) {
-      try { alleUrls = JSON.parse(alteFlaschen.bild_urls) } catch { alleUrls = [] }
+    if (alteF?.bild_urls) { try { alleUrls = JSON.parse(alteF.bild_urls) } catch { alleUrls = [] } }
+    if (alleUrls.length === 0 && alteF?.bild_url) alleUrls = [alteF.bild_url]
+
+    for (const datei of dateien) {
+      alleUrls.push(await bildHochladen(datei))
     }
-    if (alleUrls.length === 0 && alteFlaschen?.bild_url) alleUrls = [alteFlaschen.bild_url]
-    alleUrls.push(neueUrl)
 
     daten.bild_url  = alleUrls[0]
-    daten.bild_urls = JSON.stringify(alleUrls)
+    daten.bild_urls = alleUrls.length > 1 ? JSON.stringify(alleUrls) : null
   }
 
   const { error } = await client.from('flaschen').update(daten).eq('id', id)
@@ -291,15 +287,8 @@ function flascheBearbeiten(id) {
   let urls = []
   if (f.bild_urls) { try { urls = JSON.parse(f.bild_urls) } catch { urls = [] } }
   if (urls.length === 0 && f.bild_url) urls = [f.bild_url]
-
-  const vorschau    = document.getElementById('foto-vorschau')
-  const vorschauImg = document.getElementById('foto-vorschau-img')
-  if (urls.length > 0) {
-    vorschauImg.src = urls[0]
-    vorschau.style.display = 'block'
-  } else {
-    vorschau.style.display = 'none'
-  }
+  vorschauDateien = []
+  fotoVorschauUrls(urls)
 
   document.getElementById('f-name').focus()
 }
@@ -354,11 +343,12 @@ function modalOeffnen() {
 function modalSchliessen() {
   document.getElementById('modal-overlay').classList.remove('offen')
   document.getElementById('flasche-form').reset()
-  document.getElementById('foto-vorschau').style.display = 'none'
+  document.getElementById('foto-vorschau').innerHTML = ''
   document.querySelector('#modal-overlay .modal-header h2').textContent = 'Neue Flasche'
   document.getElementById('form-speichern').textContent = 'Speichern'
   formAlertSetzen('', '')
-  bearbeitungsId = null
+  bearbeitungsId  = null
+  vorschauDateien = []
 }
 
 function formAlertSetzen(text, typ) {
@@ -366,6 +356,41 @@ function formAlertSetzen(text, typ) {
   if (!el) return
   el.textContent = text
   el.className   = 'form-alert ' + typ
+}
+
+// ─── Multi-photo preview ──────────────────────────────────────────────────────
+function fotoVorschauZeigen(dateien) {
+  vorschauDateien = dateien
+  const grid = document.getElementById('foto-vorschau')
+  grid.innerHTML = ''
+
+  dateien.forEach((datei, i) => {
+    const item = document.createElement('div')
+    item.className = 'foto-vorschau-item'
+
+    const img = document.createElement('img')
+    img.src = URL.createObjectURL(datei)
+
+    const btn = document.createElement('button')
+    btn.className = 'remove-foto'
+    btn.type = 'button'
+    btn.textContent = '✕'
+    btn.addEventListener('click', () => {
+      vorschauDateien = vorschauDateien.filter((_, idx) => idx !== i)
+      fotoVorschauZeigen(vorschauDateien)
+    })
+
+    item.appendChild(img)
+    item.appendChild(btn)
+    grid.appendChild(item)
+  })
+}
+
+function fotoVorschauUrls(urls) {
+  const grid = document.getElementById('foto-vorschau')
+  grid.innerHTML = urls.map(u =>
+    `<div class="foto-vorschau-item"><img src="${esc(u)}" loading="lazy"></div>`
+  ).join('')
 }
 
 // ─── Auth events ─────────────────────────────────────────────────────────────
@@ -424,14 +449,9 @@ function initEvents() {
     if (e.target === e.currentTarget) modalSchliessen()
   })
 
-  // Image preview
+  // Image preview — multiple files
   document.getElementById('f-foto').addEventListener('change', e => {
-    const datei = e.target.files[0]
-    if (!datei) return
-    const vorschau    = document.getElementById('foto-vorschau')
-    const vorschauImg = document.getElementById('foto-vorschau-img')
-    vorschauImg.src = URL.createObjectURL(datei)
-    vorschau.style.display = 'block'
+    fotoVorschauZeigen(Array.from(e.target.files))
   })
 
   // Image drag & drop
@@ -441,11 +461,8 @@ function initEvents() {
   uploadArea.addEventListener('drop', e => {
     e.preventDefault()
     uploadArea.classList.remove('drag-over')
-    const datei = e.dataTransfer.files[0]
-    if (datei?.type.startsWith('image/')) {
-      document.getElementById('f-foto').files = e.dataTransfer.files
-      document.getElementById('f-foto').dispatchEvent(new Event('change'))
-    }
+    const neueDateien = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    if (neueDateien.length) fotoVorschauZeigen([...vorschauDateien, ...neueDateien])
   })
 
   // Form submit
@@ -474,14 +491,12 @@ function initEvents() {
       destillerie:    document.getElementById('f-destillerie').value.trim()  || null,
       hergestellt_in: document.getElementById('f-hergestellt').value.trim()  || null,
     }
-    const bildDatei = document.getElementById('f-foto').files[0] || null
-
     try {
       if (bearbeitungsId) {
-        await flascheAktualisieren(bearbeitungsId, daten, bildDatei)
+        await flascheAktualisieren(bearbeitungsId, daten, vorschauDateien)
         statusSetzen('✓ ' + name + ' aktualisiert', 'ok')
       } else {
-        await flascheSpeichern(daten, bildDatei)
+        await flascheSpeichern(daten, vorschauDateien)
         statusSetzen('✓ ' + name + ' gespeichert', 'ok')
       }
 

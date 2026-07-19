@@ -156,14 +156,12 @@
         </div>
 
         <div class="form-row">
-          <label>Foto <span class="hint">(optional · max. 5 MB)</span></label>
+          <label>Fotos <span class="hint">(optional · mehrere möglich · max. 5 MB pro Bild)</span></label>
           <div class="file-upload-area" id="foto-upload-area">
-            <input type="file" id="f-foto" accept="image/*">
-            <span>📷 Bild auswählen oder hierher ziehen</span>
+            <input type="file" id="f-foto" accept="image/*" multiple>
+            <span>📷 Bilder auswählen oder hierher ziehen</span>
           </div>
-          <div id="foto-vorschau" style="display:none">
-            <img id="foto-vorschau-img" src="" alt="Vorschau">
-          </div>
+          <div id="foto-vorschau" class="foto-vorschau-grid"></div>
         </div>
 
         <div class="form-actions">
