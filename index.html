@@ -18,6 +18,7 @@
       <button id="hero-menue-btn" class="hero-menue-btn" title="Optionen">⋯</button>
       <div class="hero-menue-liste" id="hero-menue-liste">
         <button id="hero-foto-btn">📷 Titelbild ändern</button>
+        <button id="hero-komprimieren-btn">🗜 Alle Bilder verkleinern</button>
       </div>
     </div>
     <input type="file" id="hero-foto-input" accept="image/*" style="display:none">
@@ -207,6 +208,29 @@
       </div>
       <div class="detail-bilder" id="detail-bilder"></div>
       <div class="detail-body" id="detail-body"></div>
+    </div>
+  </div>
+
+  <!-- Bilder-Verkleinern Modal (Admin) -->
+  <div class="modal-overlay" id="komp-overlay">
+    <div class="modal modal-klein">
+      <div class="modal-header">
+        <h2>Bilder verkleinern</h2>
+        <button class="modal-close" id="komp-close">✕</button>
+      </div>
+      <div class="komp-body">
+        <p class="komp-info" id="komp-info">
+          Verkleinert alle Fotos direkt im Speicher auf max. 1600px.
+          Die Adressen bleiben unverändert — nichts geht kaputt.
+        </p>
+        <div class="komp-leiste"><div class="komp-balken" id="komp-balken"></div></div>
+        <p class="komp-text"   id="komp-text">Noch nicht gestartet</p>
+        <p class="komp-detail" id="komp-detail"></p>
+        <div class="form-actions">
+          <button type="button" id="komp-abbrechen" class="btn-sekundaer" style="display:none">Anhalten</button>
+          <button type="button" id="komp-start" class="btn-primaer">Starten</button>
+        </div>
+      </div>
     </div>
   </div>
 

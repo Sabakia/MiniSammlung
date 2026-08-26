@@ -280,6 +280,108 @@ function bildVerkleinern(datei, maxKante = MAX_KANTE) {
   })
 }
 
+// ─── Bestehende Bilder im Speicher verkleinern ───────────────────────────────
+// Ueberschreibt jedes Bild unter identischem Namen. Adressen bleiben gleich,
+// deshalb muss weder die Datenbank noch sonst etwas angefasst werden.
+const SPEICHER_PRAEFIX = `${SUPABASE_URL}/storage/v1/object/public/SammlungBilder/`
+const SCHON_KLEIN_KB   = 400
+
+let kompLaeuft   = false
+let kompAbbruch  = false
+
+function kompPfadeSammeln() {
+  const pfade = new Set()
+  alleFlaschen.forEach(f => {
+    const urls = []
+    if (f.bild_url) urls.push(f.bild_url)
+    if (f.bild_urls) { try { urls.push(...JSON.parse(f.bild_urls)) } catch { /* ignorieren */ } }
+    urls.forEach(u => {
+      if (typeof u === 'string' && u.startsWith(SPEICHER_PRAEFIX)) {
+        pfade.add(decodeURIComponent(u.slice(SPEICHER_PRAEFIX.length).split('?')[0]))
+      }
+    })
+  })
+  return [...pfade]
+}
+
+function kompAnzeige(prozent, text, detail = '', klasse = '') {
+  document.getElementById('komp-balken').style.width = prozent + '%'
+  document.getElementById('komp-text').textContent   = text
+  const d = document.getElementById('komp-detail')
+  d.textContent = detail
+  d.className   = 'komp-detail ' + klasse
+}
+
+async function alleBilderVerkleinern() {
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) { kompAnzeige(0, 'Nicht angemeldet', 'Bitte zuerst als Admin anmelden.', 'err'); return }
+
+  const pfade = kompPfadeSammeln()
+  if (pfade.length === 0) { kompAnzeige(100, 'Nichts zu tun', 'Keine Bilder im Supabase-Speicher.', 'ok'); return }
+
+  kompLaeuft  = true
+  kompAbbruch = false
+  document.getElementById('komp-start').style.display     = 'none'
+  document.getElementById('komp-abbrechen').style.display = ''
+
+  let fertig = 0, verkleinert = 0, uebersprungen = 0, fehler = 0
+  let bytesVorher = 0, bytesNachher = 0
+
+  for (const pfad of pfade) {
+    if (kompAbbruch) break
+    fertig++
+    const prozent = Math.round((fertig / pfade.length) * 100)
+    kompAnzeige(prozent, `${fertig} von ${pfade.length}`, pfad.slice(0, 46) + '…')
+
+    try {
+      const { data: blob, error: ladeFehler } = await client.storage
+        .from('SammlungBilder').download(pfad)
+      if (ladeFehler || !blob) { fehler++; continue }
+
+      bytesVorher += blob.size
+
+      // Schon klein genug — nicht erneut umwandeln, das kostet nur Qualitaet
+      if (blob.size <= SCHON_KLEIN_KB * 1024) {
+        bytesNachher += blob.size
+        uebersprungen++
+        continue
+      }
+
+      const klein = await bildVerkleinern(blob)
+      if (klein.size >= blob.size) { bytesNachher += blob.size; uebersprungen++; continue }
+
+      const { error: schreibFehler } = await client.storage
+        .from('SammlungBilder')
+        .upload(pfad, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
+
+      if (schreibFehler) { fehler++; bytesNachher += blob.size; continue }
+
+      bytesNachher += klein.size
+      verkleinert++
+    } catch {
+      fehler++
+    }
+  }
+
+  const vorherMB  = (bytesVorher  / 1048576).toFixed(0)
+  const nachherMB = (bytesNachher / 1048576).toFixed(0)
+  const titel     = kompAbbruch ? 'Angehalten' : 'Fertig'
+
+  kompAnzeige(
+    Math.round((fertig / pfade.length) * 100),
+    `${titel} — ${verkleinert} verkleinert`,
+    `${vorherMB} MB → ${nachherMB} MB` +
+      (uebersprungen ? ` · ${uebersprungen} schon klein` : '') +
+      (fehler ? ` · ${fehler} Fehler` : ''),
+    fehler ? 'err' : 'ok'
+  )
+
+  kompLaeuft = false
+  document.getElementById('komp-start').style.display     = ''
+  document.getElementById('komp-start').textContent       = 'Nochmal durchlaufen'
+  document.getElementById('komp-abbrechen').style.display = 'none'
+}
+
 // ─── Hero / title image ───────────────────────────────────────────────────────
 const TITELBILD_DATEI = 'titelbild'
 
@@ -714,6 +816,23 @@ function initEvents() {
   document.getElementById('hero-foto-btn').addEventListener('click', () => {
     heroMenue.classList.remove('offen')
     document.getElementById('hero-foto-input').click()
+  })
+
+  // Alle Bilder verkleinern (admin)
+  const kompOverlay = document.getElementById('komp-overlay')
+  document.getElementById('hero-komprimieren-btn').addEventListener('click', () => {
+    heroMenue.classList.remove('offen')
+    const anzahl = kompPfadeSammeln().length
+    kompAnzeige(0, 'Noch nicht gestartet', `${anzahl} Bilder im Supabase-Speicher gefunden`)
+    document.getElementById('komp-start').textContent = 'Starten'
+    kompOverlay.classList.add('offen')
+  })
+  document.getElementById('komp-start').addEventListener('click', alleBilderVerkleinern)
+  document.getElementById('komp-abbrechen').addEventListener('click', () => { kompAbbruch = true })
+  document.getElementById('komp-close').addEventListener('click', () => {
+    if (kompLaeuft && !confirm('Verkleinern läuft noch. Wirklich schließen?')) return
+    kompAbbruch = true
+    kompOverlay.classList.remove('offen')
   })
   document.getElementById('hero-foto-input').addEventListener('change', e => {
     const datei = e.target.files[0]

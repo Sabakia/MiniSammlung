@@ -708,6 +708,51 @@ main { padding: 1px; }
   transform: translate(50%, calc(-50% - 2px));
 }
 
+/* ── Bilder-Verkleinern Modal ── */
+.komp-body { padding: 1.5rem; }
+
+.komp-info {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 1.25rem;
+}
+
+.komp-leiste {
+  height: 6px;
+  background: var(--s2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: .85rem;
+}
+
+.komp-balken {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--amber), var(--amber-2));
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+
+.komp-text {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream);
+  margin-bottom: .3rem;
+}
+
+.komp-detail {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 1.2em;
+  margin-bottom: 1.25rem;
+}
+
+.komp-detail.ok  { color: var(--amber-2); }
+.komp-detail.err { color: #d9534f; }
+
 /* ── Multi-photo badge ── */
 .foto-anzahl {
   position: absolute;
