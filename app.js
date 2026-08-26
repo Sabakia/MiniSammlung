@@ -194,7 +194,8 @@ function karteHTML(f) {
     return `
     <article class="flasche-karte mit-bild">
       <div class="karte-galerie">
-        <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy">
+        <img src="${esc(bilder[0])}" alt="${esc(f.name)}" class="karte-bild" loading="lazy"
+             onerror="this.style.display='none'">
         ${fotoBadge}
         ${editBtn}
         ${fotoBtn}
@@ -310,7 +311,12 @@ async function titelbildHochladen(datei) {
 
 // ─── Upload one image, return public URL ─────────────────────────────────────
 async function bildHochladen(datei) {
-  const klein      = await bildVerkleinern(datei)
+  const klein = await bildVerkleinern(datei)
+
+  const vorherMB  = (datei.size / 1048576).toFixed(1)
+  const nachherKB = Math.round(klein.size / 1024)
+  statusSetzen(`Lade Bild hoch… ${vorherMB} MB → ${nachherKB} KB`)
+
   const basisName  = datei.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_')
   const dateiname  = `${Date.now()}-${Math.random().toString(36).slice(2)}-${basisName}.jpg`
   const { error } = await client.storage
@@ -775,7 +781,9 @@ function detailOeffnen(id) {
 
   // Photos
   const bilderEl = document.getElementById('detail-bilder')
-  bilderEl.innerHTML = urls.map(u => `<img src="${esc(u)}" loading="lazy">`).join('')
+  bilderEl.innerHTML = urls
+    .map(u => `<img src="${esc(u)}" loading="lazy" onerror="this.remove()">`)
+    .join('')
 
   // Info rows
   const reihen = [
