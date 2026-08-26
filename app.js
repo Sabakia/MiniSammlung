@@ -244,6 +244,41 @@ function fuelleDatalist() {
   }
 }
 
+// ─── Bilder vor dem Upload verkleinern ───────────────────────────────────────
+// Handy-Fotos sind 5–12 MB. Verkleinert landen sie bei ~100–200 KB.
+const MAX_KANTE      = 1600   // längste Kante in Pixeln
+const JPEG_QUALITAET = 0.82
+
+function bildVerkleinern(datei, maxKante = MAX_KANTE) {
+  return new Promise(resolve => {
+    if (!datei.type.startsWith('image/')) { resolve(datei); return }
+
+    const objektUrl = URL.createObjectURL(datei)
+    const img = new Image()
+
+    img.onload = () => {
+      URL.revokeObjectURL(objektUrl)
+      const faktor = Math.min(1, maxKante / Math.max(img.width, img.height))
+      const breite = Math.round(img.width  * faktor)
+      const hoehe  = Math.round(img.height * faktor)
+
+      const canvas  = document.createElement('canvas')
+      canvas.width  = breite
+      canvas.height = hoehe
+      canvas.getContext('2d').drawImage(img, 0, 0, breite, hoehe)
+
+      canvas.toBlob(blob => {
+        // Nur nehmen wenn wirklich kleiner, sonst Original behalten
+        resolve(blob && blob.size < datei.size ? blob : datei)
+      }, 'image/jpeg', JPEG_QUALITAET)
+    }
+
+    // z.B. HEIC das der Browser nicht dekodiert → Original hochladen
+    img.onerror = () => { URL.revokeObjectURL(objektUrl); resolve(datei) }
+    img.src = objektUrl
+  })
+}
+
 // ─── Hero / title image ───────────────────────────────────────────────────────
 const TITELBILD_DATEI = 'titelbild'
 
@@ -257,10 +292,14 @@ function ladeTitelbild() {
 }
 
 async function titelbildHochladen(datei) {
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) { statusSetzen('Nicht autorisiert.', 'err'); return }
+  statusSetzen('Titelbild wird verkleinert…')
+  const klein = await bildVerkleinern(datei, 2000)
   statusSetzen('Titelbild wird hochgeladen…')
   const { error } = await client.storage
     .from('SammlungBilder')
-    .upload(TITELBILD_DATEI, datei, { upsert: true, contentType: datei.type, cacheControl: '3600' })
+    .upload(TITELBILD_DATEI, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
   if (error) {
     statusSetzen('Fehler beim Titelbild: ' + error.message, 'err')
     return
@@ -271,15 +310,20 @@ async function titelbildHochladen(datei) {
 
 // ─── Upload one image, return public URL ─────────────────────────────────────
 async function bildHochladen(datei) {
-  const sicherName = datei.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const dateiname  = `${Date.now()}-${Math.random().toString(36).slice(2)}-${sicherName}`
-  const { error } = await client.storage.from('SammlungBilder').upload(dateiname, datei)
+  const klein      = await bildVerkleinern(datei)
+  const basisName  = datei.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_')
+  const dateiname  = `${Date.now()}-${Math.random().toString(36).slice(2)}-${basisName}.jpg`
+  const { error } = await client.storage
+    .from('SammlungBilder')
+    .upload(dateiname, klein, { contentType: 'image/jpeg', cacheControl: '3600' })
   if (error) throw new Error('Bild-Upload: ' + error.message)
   return client.storage.from('SammlungBilder').getPublicUrl(dateiname).data.publicUrl
 }
 
 // ─── Save new bottle ──────────────────────────────────────────────────────────
 async function flascheSpeichern(daten, dateien) {
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error('Nicht autorisiert.')
   const urls = []
   for (const datei of dateien) {
     urls.push(await bildHochladen(datei))
@@ -297,6 +341,8 @@ async function flascheSpeichern(daten, dateien) {
 
 // ─── Update existing bottle ───────────────────────────────────────────────────
 async function flascheAktualisieren(id, daten, dateien) {
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error('Nicht autorisiert.')
   const neueUrls = []
   for (const datei of dateien) neueUrls.push(await bildHochladen(datei))
 
@@ -376,6 +422,9 @@ function exportDaten() {
 
 // ─── Import from JSON ─────────────────────────────────────────────────────────
 async function importDaten(datei) {
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) { statusSetzen('Nicht autorisiert.', 'err'); return }
+
   let daten
   try {
     const text = await datei.text()
@@ -386,8 +435,12 @@ async function importDaten(datei) {
     return
   }
 
+  const erlaubteFelder = ['name','kategorie','groesse_ml','alkohol_vol','material',
+                          'hinzugefuegt','geschmack','destillerie','hergestellt_in','notiz']
   statusSetzen(`Importiere ${daten.length} Einträge…`)
-  const bereinigt = daten.map(({ id, erstellt_am, ...rest }) => rest)
+  const bereinigt = daten.map(raw =>
+    Object.fromEntries(erlaubteFelder.filter(k => k in raw).map(k => [k, raw[k]]))
+  )
 
   const { error } = await client.from('flaschen').insert(bereinigt)
   if (error) { statusSetzen('❌ ' + error.message, 'err'); return }
@@ -536,9 +589,14 @@ function initEvents() {
     if (e.target === e.currentTarget) modalSchliessen()
   })
 
-  // Image preview — append new files to existing
+  // Image preview — append new files, block SVG and oversized files
+  const ERLAUBTE_TYPEN  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+  const MAX_DATEI_BYTES = 5 * 1024 * 1024
   document.getElementById('f-foto').addEventListener('change', e => {
-    vorschauDateien = [...vorschauDateien, ...Array.from(e.target.files)]
+    const gefiltert = Array.from(e.target.files).filter(f =>
+      ERLAUBTE_TYPEN.includes(f.type) && f.size <= MAX_DATEI_BYTES
+    )
+    vorschauDateien = [...vorschauDateien, ...gefiltert]
     renderFotoVorschau()
     e.target.value = ''
   })
@@ -690,6 +748,7 @@ document.addEventListener('click', e => {
   const karte = e.target.closest('.flasche-karte')
   if (!karte) return
   if (e.target.closest('.edit-btn')) return
+  if (e.target.closest('.admin-foto-btn')) return
   const id = karte.querySelector('.edit-btn')?.dataset.id
   if (!id) return
   detailOeffnen(id)
