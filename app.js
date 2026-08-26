@@ -327,41 +327,59 @@ async function alleBilderVerkleinern() {
   let fertig = 0, verkleinert = 0, uebersprungen = 0, fehler = 0
   let bytesVorher = 0, bytesNachher = 0
 
-  for (const pfad of pfade) {
-    if (kompAbbruch) break
-    fertig++
-    const prozent = Math.round((fertig / pfade.length) * 100)
-    kompAnzeige(prozent, `${fertig} von ${pfade.length}`, pfad.slice(0, 46) + '…')
+  // Ein einzelnes Bild holen, verkleinern, zurueckschreiben
+  async function einBildBearbeiten(pfad) {
+    const { data: blob, error: ladeFehler } = await client.storage
+      .from('SammlungBilder').download(pfad)
+    if (ladeFehler || !blob) { fehler++; return }
 
-    try {
-      const { data: blob, error: ladeFehler } = await client.storage
-        .from('SammlungBilder').download(pfad)
-      if (ladeFehler || !blob) { fehler++; continue }
+    bytesVorher += blob.size
 
-      bytesVorher += blob.size
+    // Schon klein genug — nicht erneut umwandeln, das kostet nur Qualitaet
+    if (blob.size <= SCHON_KLEIN_KB * 1024) {
+      bytesNachher += blob.size
+      uebersprungen++
+      return
+    }
 
-      // Schon klein genug — nicht erneut umwandeln, das kostet nur Qualitaet
-      if (blob.size <= SCHON_KLEIN_KB * 1024) {
-        bytesNachher += blob.size
-        uebersprungen++
-        continue
+    const klein = await bildVerkleinern(blob)
+    if (klein.size >= blob.size) { bytesNachher += blob.size; uebersprungen++; return }
+
+    const { error: schreibFehler } = await client.storage
+      .from('SammlungBilder')
+      .upload(pfad, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
+
+    if (schreibFehler) { fehler++; bytesNachher += blob.size; return }
+
+    bytesNachher += klein.size
+    verkleinert++
+  }
+
+  // Mehrere parallel abarbeiten — sonst dauert der Durchlauf fast eine Stunde
+  const GLEICHZEITIG = 4
+  let naechster = 0
+
+  async function arbeiter() {
+    while (!kompAbbruch) {
+      const i = naechster++
+      if (i >= pfade.length) return
+
+      try {
+        await einBildBearbeiten(pfade[i])
+      } catch {
+        fehler++
       }
 
-      const klein = await bildVerkleinern(blob)
-      if (klein.size >= blob.size) { bytesNachher += blob.size; uebersprungen++; continue }
-
-      const { error: schreibFehler } = await client.storage
-        .from('SammlungBilder')
-        .upload(pfad, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
-
-      if (schreibFehler) { fehler++; bytesNachher += blob.size; continue }
-
-      bytesNachher += klein.size
-      verkleinert++
-    } catch {
-      fehler++
+      fertig++
+      kompAnzeige(
+        Math.round((fertig / pfade.length) * 100),
+        `${fertig} von ${pfade.length}`,
+        `${verkleinert} verkleinert · ${Math.round(bytesNachher / 1048576)} MB bisher`
+      )
     }
   }
+
+  await Promise.all(Array.from({ length: GLEICHZEITIG }, arbeiter))
 
   const vorherMB  = (bytesVorher  / 1048576).toFixed(0)
   const nachherMB = (bytesNachher / 1048576).toFixed(0)
