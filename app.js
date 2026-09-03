@@ -1,7 +1,11 @@
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Supabase wird nicht mehr benutzt — Daten und Bilder liegen komplett in GitHub.
+// Grund: Supabase sperrt beim Ueberschreiten des Gratis-Limits das gesamte
+// Projekt inklusive Datenbank; das ist zweimal passiert.
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let alleFlaschen     = []
+let istAdmin         = false
+let datenSha         = null   // Version der sammlung.json, fuer sicheres Schreiben
 let aktiveKategorie  = 'alle'
 let suchbegriff      = ''
 let bearbeitungsId   = null   // null = neue Flasche; ID = Bearbeiten-Modus
@@ -19,8 +23,7 @@ function esc(str) {
 }
 
 // ─── Auth UI ─────────────────────────────────────────────────────────────────
-function updateAuthUI(user) {
-  const eingeloggt = !!user
+function updateAuthUI(eingeloggt) {
   document.getElementById('neu-btn').style.display     = eingeloggt ? '' : 'none'
   document.getElementById('login-btn').style.display   = eingeloggt ? 'none' : ''
   document.getElementById('logout-btn').style.display  = eingeloggt ? '' : 'none'
@@ -32,7 +35,7 @@ function updateAuthUI(user) {
 
 function loginModalOeffnen() {
   document.getElementById('login-overlay').classList.add('offen')
-  document.getElementById('login-email').focus()
+  document.getElementById('login-password').focus()
 }
 
 function loginModalSchliessen() {
@@ -50,21 +53,56 @@ function statusSetzen(text, typ = '') {
 }
 
 // ─── Load all bottles ─────────────────────────────────────────────────────────
+const DATEN_PFAD = 'data/sammlung.json'
+
 async function ladeFlaschen() {
   statusSetzen('Lade…')
-  const { data, error } = await client
-    .from('flaschen')
-    .select('*')
-    .order('erstellt_am', { ascending: false })
+  try {
+    // Cache umgehen, sonst sieht man eigene Aenderungen minutenlang nicht
+    const antwort = await fetch(
+      `${GITHUB_ROH_BASIS}/${DATEN_PFAD}?v=${Date.now()}`, { cache: 'no-store' }
+    )
+    if (!antwort.ok) throw new Error('HTTP ' + antwort.status)
 
-  if (error) {
-    statusSetzen('Fehler: ' + error.message, 'err')
-    return
+    const daten  = await antwort.json()
+    alleFlaschen = Array.isArray(daten) ? daten : []
+    updateGesamtAnzahl()
+    statusSetzen('✓ ' + alleFlaschen.length + ' Flaschen', 'ok')
+  } catch (err) {
+    statusSetzen('Fehler beim Laden: ' + err.message, 'err')
   }
+}
 
-  alleFlaschen = data || []
-  updateGesamtAnzahl()
-  statusSetzen('✓ ' + alleFlaschen.length + ' Flaschen', 'ok')
+// Schreibt die Sammlung zurueck ins Repo. Holt vorher die aktuelle Version,
+// damit parallele Aenderungen von einem anderen Geraet nicht verlorengehen.
+async function flaschenSpeichernNachGitHub(nachricht) {
+  const apiUrl = `${GITHUB_API_BASIS}/${DATEN_PFAD}`
+
+  const aktuell = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}&v=${Date.now()}`, {
+    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+    cache: 'no-store',
+  })
+  if (!aktuell.ok) throw new Error('Konnte aktuelle Daten nicht lesen (HTTP ' + aktuell.status + ')')
+  datenSha = (await aktuell.json()).sha
+
+  const text   = JSON.stringify(alleFlaschen, null, 1)
+  const inhalt = btoa(String.fromCharCode(...new TextEncoder().encode(text)))
+
+  const antwort = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: nachricht, content: inhalt, sha: datenSha, branch: GITHUB_BRANCH }),
+  })
+
+  if (!antwort.ok) {
+    const fehler = await antwort.json().catch(() => ({}))
+    throw new Error('Speichern: ' + (fehler.message || antwort.status))
+  }
+  datenSha = (await antwort.json()).content.sha
 }
 
 function updateGesamtAnzahl() {
@@ -280,125 +318,6 @@ function bildVerkleinern(datei, maxKante = MAX_KANTE) {
   })
 }
 
-// ─── Bestehende Bilder im Speicher verkleinern ───────────────────────────────
-// Ueberschreibt jedes Bild unter identischem Namen. Adressen bleiben gleich,
-// deshalb muss weder die Datenbank noch sonst etwas angefasst werden.
-const SPEICHER_PRAEFIX = `${SUPABASE_URL}/storage/v1/object/public/SammlungBilder/`
-const SCHON_KLEIN_KB   = 400
-
-let kompLaeuft   = false
-let kompAbbruch  = false
-
-function kompPfadeSammeln() {
-  const pfade = new Set()
-  alleFlaschen.forEach(f => {
-    const urls = []
-    if (f.bild_url) urls.push(f.bild_url)
-    if (f.bild_urls) { try { urls.push(...JSON.parse(f.bild_urls)) } catch { /* ignorieren */ } }
-    urls.forEach(u => {
-      if (typeof u === 'string' && u.startsWith(SPEICHER_PRAEFIX)) {
-        pfade.add(decodeURIComponent(u.slice(SPEICHER_PRAEFIX.length).split('?')[0]))
-      }
-    })
-  })
-  return [...pfade]
-}
-
-function kompAnzeige(prozent, text, detail = '', klasse = '') {
-  document.getElementById('komp-balken').style.width = prozent + '%'
-  document.getElementById('komp-text').textContent   = text
-  const d = document.getElementById('komp-detail')
-  d.textContent = detail
-  d.className   = 'komp-detail ' + klasse
-}
-
-async function alleBilderVerkleinern() {
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) { kompAnzeige(0, 'Nicht angemeldet', 'Bitte zuerst als Admin anmelden.', 'err'); return }
-
-  const pfade = kompPfadeSammeln()
-  if (pfade.length === 0) { kompAnzeige(100, 'Nichts zu tun', 'Keine Bilder im Supabase-Speicher.', 'ok'); return }
-
-  kompLaeuft  = true
-  kompAbbruch = false
-  document.getElementById('komp-start').style.display     = 'none'
-  document.getElementById('komp-abbrechen').style.display = ''
-
-  let fertig = 0, verkleinert = 0, uebersprungen = 0, fehler = 0
-  let bytesVorher = 0, bytesNachher = 0
-
-  // Ein einzelnes Bild holen, verkleinern, zurueckschreiben
-  async function einBildBearbeiten(pfad) {
-    const { data: blob, error: ladeFehler } = await client.storage
-      .from('SammlungBilder').download(pfad)
-    if (ladeFehler || !blob) { fehler++; return }
-
-    bytesVorher += blob.size
-
-    // Schon klein genug — nicht erneut umwandeln, das kostet nur Qualitaet
-    if (blob.size <= SCHON_KLEIN_KB * 1024) {
-      bytesNachher += blob.size
-      uebersprungen++
-      return
-    }
-
-    const klein = await bildVerkleinern(blob)
-    if (klein.size >= blob.size) { bytesNachher += blob.size; uebersprungen++; return }
-
-    const { error: schreibFehler } = await client.storage
-      .from('SammlungBilder')
-      .upload(pfad, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
-
-    if (schreibFehler) { fehler++; bytesNachher += blob.size; return }
-
-    bytesNachher += klein.size
-    verkleinert++
-  }
-
-  // Mehrere parallel abarbeiten — sonst dauert der Durchlauf fast eine Stunde
-  const GLEICHZEITIG = 4
-  let naechster = 0
-
-  async function arbeiter() {
-    while (!kompAbbruch) {
-      const i = naechster++
-      if (i >= pfade.length) return
-
-      try {
-        await einBildBearbeiten(pfade[i])
-      } catch {
-        fehler++
-      }
-
-      fertig++
-      kompAnzeige(
-        Math.round((fertig / pfade.length) * 100),
-        `${fertig} von ${pfade.length}`,
-        `${verkleinert} verkleinert · ${Math.round(bytesNachher / 1048576)} MB bisher`
-      )
-    }
-  }
-
-  await Promise.all(Array.from({ length: GLEICHZEITIG }, arbeiter))
-
-  const vorherMB  = (bytesVorher  / 1048576).toFixed(0)
-  const nachherMB = (bytesNachher / 1048576).toFixed(0)
-  const titel     = kompAbbruch ? 'Angehalten' : 'Fertig'
-
-  kompAnzeige(
-    Math.round((fertig / pfade.length) * 100),
-    `${titel} — ${verkleinert} verkleinert`,
-    `${vorherMB} MB → ${nachherMB} MB` +
-      (uebersprungen ? ` · ${uebersprungen} schon klein` : '') +
-      (fehler ? ` · ${fehler} Fehler` : ''),
-    fehler ? 'err' : 'ok'
-  )
-
-  kompLaeuft = false
-  document.getElementById('komp-start').style.display     = ''
-  document.getElementById('komp-start').textContent       = 'Nochmal durchlaufen'
-  document.getElementById('komp-abbrechen').style.display = 'none'
-}
 
 // ─── Bilder-Ablage: GitHub statt Supabase Storage ────────────────────────────
 // Grund: Supabase Storage hat ein Gratis-Limit von 1 GB und sperrt bei
@@ -459,8 +378,7 @@ function ladeTitelbild() {
 }
 
 async function titelbildHochladen(datei) {
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) { statusSetzen('Nicht autorisiert.', 'err'); return }
+  if (!istAdmin) { statusSetzen('Nicht autorisiert.', 'err'); return }
   statusSetzen('Titelbild wird verkleinert…')
   const klein = await bildVerkleinern(datei, 2000)
   statusSetzen('Titelbild wird hochgeladen…')
@@ -492,37 +410,43 @@ async function bildHochladen(datei) {
 }
 
 // ─── Save new bottle ──────────────────────────────────────────────────────────
+function neueId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 async function flascheSpeichern(daten, dateien) {
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) throw new Error('Nicht autorisiert.')
+  if (!istAdmin) throw new Error('Nicht autorisiert.')
+
   const urls = []
-  for (const datei of dateien) {
-    urls.push(await bildHochladen(datei))
-  }
+  for (const datei of dateien) urls.push(await bildHochladen(datei))
 
   const eintrag = {
     ...daten,
-    bild_url:  urls[0]  || null,
-    bild_urls: urls.length > 1 ? JSON.stringify(urls) : null,
+    id:          neueId(),
+    erstellt_am: new Date().toISOString(),
+    bild_url:    urls[0] || null,
+    bild_urls:   urls.length > 1 ? JSON.stringify(urls) : null,
   }
 
-  const { error } = await client.from('flaschen').insert(eintrag)
-  if (error) throw new Error(error.message)
+  alleFlaschen = [...alleFlaschen, eintrag]
+  await flaschenSpeichernNachGitHub(`Flasche hinzugefügt: ${daten.name}`)
 }
 
 // ─── Update existing bottle ───────────────────────────────────────────────────
 async function flascheAktualisieren(id, daten, dateien) {
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) throw new Error('Nicht autorisiert.')
+  if (!istAdmin) throw new Error('Nicht autorisiert.')
+
   const neueUrls = []
   for (const datei of dateien) neueUrls.push(await bildHochladen(datei))
 
-  const alleUrls = [...behalteneUrls, ...neueUrls]
+  const alleUrls  = [...behalteneUrls, ...neueUrls]
   daten.bild_url  = alleUrls[0] || null
   daten.bild_urls = alleUrls.length > 1 ? JSON.stringify(alleUrls) : null
 
-  const { error } = await client.from('flaschen').update(daten).eq('id', id)
-  if (error) throw new Error(error.message)
+  alleFlaschen = alleFlaschen.map(f =>
+    String(f.id) === String(id) ? { ...f, ...daten } : f
+  )
+  await flaschenSpeichernNachGitHub(`Flasche bearbeitet: ${daten.name}`)
 }
 
 // ─── Open edit modal prefilled ────────────────────────────────────────────────
@@ -593,8 +517,7 @@ function exportDaten() {
 
 // ─── Import from JSON ─────────────────────────────────────────────────────────
 async function importDaten(datei) {
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) { statusSetzen('Nicht autorisiert.', 'err'); return }
+  if (!istAdmin) { statusSetzen('Nicht autorisiert.', 'err'); return }
 
   let daten
   try {
@@ -609,14 +532,23 @@ async function importDaten(datei) {
   const erlaubteFelder = ['name','kategorie','groesse_ml','alkohol_vol','material',
                           'hinzugefuegt','geschmack','destillerie','hergestellt_in','notiz']
   statusSetzen(`Importiere ${daten.length} Einträge…`)
-  const bereinigt = daten.map(raw =>
-    Object.fromEntries(erlaubteFelder.filter(k => k in raw).map(k => [k, raw[k]]))
-  )
+  const bereinigt = daten.map(raw => ({
+    ...Object.fromEntries(erlaubteFelder.filter(k => k in raw).map(k => [k, raw[k]])),
+    id:          neueId(),
+    erstellt_am: new Date().toISOString(),
+    bild_url:    null,
+    bild_urls:   null,
+  }))
 
-  const { error } = await client.from('flaschen').insert(bereinigt)
-  if (error) { statusSetzen('❌ ' + error.message, 'err'); return }
+  try {
+    alleFlaschen = [...alleFlaschen, ...bereinigt]
+    await flaschenSpeichernNachGitHub(`${bereinigt.length} Flaschen importiert`)
+  } catch (err) {
+    statusSetzen('❌ ' + err.message, 'err')
+    await ladeFlaschen()
+    return
+  }
 
-  await ladeFlaschen()
   renderKategorien()
   renderFlaschen()
   statusSetzen(`✓ ${daten.length} Flaschen importiert`, 'ok')
@@ -695,7 +627,27 @@ function fotoVorschauUrls(urls) {
   renderFotoVorschau()
 }
 
-// ─── Auth events ─────────────────────────────────────────────────────────────
+// ─── Auth ────────────────────────────────────────────────────────────────────
+// Hinweis: Das ist eine Bequemlichkeitshuerde, kein echter Schutz. Der
+// GitHub-Token liegt ohnehin offen im Quelltext — wer ihn dort findet, kaeme
+// auch ohne dieses Passwort ans Repo. Es verhindert nur versehentliche
+// Aenderungen durch Besucher.
+const ADMIN_HASH = ADMIN_PASSWORT_HASH   // aus github-config.js
+
+async function passwortHash(text) {
+  const roh = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return [...new Uint8Array(roh)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function adminSetzen(an) {
+  istAdmin = an
+  updateAuthUI(an)
+  try {
+    if (an) sessionStorage.setItem('mmb-admin', '1')
+    else    sessionStorage.removeItem('mmb-admin')
+  } catch { /* privater Modus — dann gilt es nur fuer diese Seite */ }
+}
+
 function initAuthEvents() {
   document.getElementById('login-btn').addEventListener('click', loginModalOeffnen)
   document.getElementById('login-close').addEventListener('click', loginModalSchliessen)
@@ -703,8 +655,8 @@ function initAuthEvents() {
     if (e.target === e.currentTarget) loginModalSchliessen()
   })
 
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    await client.auth.signOut()
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    adminSetzen(false)
     statusSetzen('Abgemeldet', '')
   })
 
@@ -712,24 +664,24 @@ function initAuthEvents() {
     e.preventDefault()
     const btn   = document.getElementById('login-submit')
     const alert = document.getElementById('login-alert')
-    const email = document.getElementById('login-email').value.trim()
     const pass  = document.getElementById('login-password').value
 
-    btn.disabled    = true
-    btn.textContent = 'Anmelden…'
+    btn.disabled      = true
+    btn.textContent   = 'Anmelden…'
     alert.textContent = ''
 
-    const { error } = await client.auth.signInWithPassword({ email, password: pass })
+    const stimmt = (await passwortHash(pass)) === ADMIN_HASH
 
-    if (error) {
-      alert.textContent = 'Falsche E-Mail oder Passwort.'
-      alert.className   = 'form-alert err'
-      btn.disabled      = false
-      btn.textContent   = 'Anmelden'
-    } else {
+    if (stimmt) {
+      adminSetzen(true)
       loginModalSchliessen()
       statusSetzen('✓ Angemeldet', 'ok')
+    } else {
+      alert.textContent = 'Falsches Passwort.'
+      alert.className   = 'form-alert err'
     }
+    btn.disabled    = false
+    btn.textContent = 'Anmelden'
   })
 }
 
@@ -881,22 +833,6 @@ function initEvents() {
     document.getElementById('hero-foto-input').click()
   })
 
-  // Alle Bilder verkleinern (admin)
-  const kompOverlay = document.getElementById('komp-overlay')
-  document.getElementById('hero-komprimieren-btn').addEventListener('click', () => {
-    heroMenue.classList.remove('offen')
-    const anzahl = kompPfadeSammeln().length
-    kompAnzeige(0, 'Noch nicht gestartet', `${anzahl} Bilder im Supabase-Speicher gefunden`)
-    document.getElementById('komp-start').textContent = 'Starten'
-    kompOverlay.classList.add('offen')
-  })
-  document.getElementById('komp-start').addEventListener('click', alleBilderVerkleinern)
-  document.getElementById('komp-abbrechen').addEventListener('click', () => { kompAbbruch = true })
-  document.getElementById('komp-close').addEventListener('click', () => {
-    if (kompLaeuft && !confirm('Verkleinern läuft noch. Wirklich schließen?')) return
-    kompAbbruch = true
-    kompOverlay.classList.remove('offen')
-  })
   document.getElementById('hero-foto-input').addEventListener('change', e => {
     const datei = e.target.files[0]
     if (datei) titelbildHochladen(datei)
@@ -998,14 +934,10 @@ function detailOeffnen(id) {
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('flaschen-grid').innerHTML = ''
 
-  // Auth state listener
-  client.auth.onAuthStateChange((_event, session) => {
-    updateAuthUI(session?.user ?? null)
-  })
-
-  // Check current session
-  const { data: { session } } = await client.auth.getSession()
-  updateAuthUI(session?.user ?? null)
+  // Anmeldung gilt bis der Tab geschlossen wird
+  let warAdmin = false
+  try { warAdmin = sessionStorage.getItem('mmb-admin') === '1' } catch { /* ignorieren */ }
+  adminSetzen(warAdmin)
 
   ladeTitelbild()
   await ladeFlaschen()

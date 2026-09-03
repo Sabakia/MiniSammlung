@@ -7,3 +7,7 @@ const GITHUB_TOKEN       = 'github_pat_11A3S4S5I02HBW6yASafkf_KLgxvmNysp53anksFk
 const GITHUB_REPO_OWNER  = 'Sabakia'
 const GITHUB_REPO_NAME   = 'Sammlung-'
 const GITHUB_BRANCH      = 'main'
+
+// SHA-256 des Admin-Passworts. Aktuell: minibar
+// Aendern: neuen Hash erzeugen lassen und hier eintragen.
+const ADMIN_PASSWORT_HASH = '9dfb2328da1bbbec0023bf4129d6f0afe4ab69260c5b5be31caac99027a48d1d'

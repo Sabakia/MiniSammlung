@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "PowerShell(git clone https://github.com/Sabakia/MiniSammlung.git \"C:\\\\Users\\\\s.kiani\\\\Mini\" 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" status 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" init)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" remote add origin https://github.com/Sabakia/MiniSammlung.git)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" pull origin main 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" add app.js galerie.html index.html style.css supabase-config.js 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" commit -m \"feat: Mini-Mini-Bar Homepage mit Supabase\" 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" push -u origin master 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" add .nojekyll)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" commit -m \"chore: add .nojekyll for GitHub Pages\")",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" push 2>&1)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\s.kiani\\\\Mini\\\\.github\\\\workflows\" 2>&1)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" add .github)",
+      "PowerShell(git -C \"C:\\\\Users\\\\s.kiani\\\\Mini\" commit -m \"chore: add GitHub Actions Pages workflow\")"
+    ]
+  }
+}
