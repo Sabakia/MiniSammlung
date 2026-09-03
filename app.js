@@ -400,16 +400,62 @@ async function alleBilderVerkleinern() {
   document.getElementById('komp-abbrechen').style.display = 'none'
 }
 
+// ─── Bilder-Ablage: GitHub statt Supabase Storage ────────────────────────────
+// Grund: Supabase Storage hat ein Gratis-Limit von 1 GB und sperrt bei
+// Ueberschreitung das GESAMTE Projekt (auch die Datenbank). GitHub hat dieses
+// Risiko fuer Bildergroessen in dieser Groessenordnung nicht.
+const GITHUB_API_BASIS = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents`
+const GITHUB_ROH_BASIS = `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/${GITHUB_BRANCH}`
+
+function blobZuBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const leser = new FileReader()
+    leser.onload  = () => resolve(leser.result.split(',')[1])
+    leser.onerror = reject
+    leser.readAsDataURL(blob)
+  })
+}
+
+// Schreibt eine Datei ins Bilder-Repo. Bei `ueberschreiben` wird vorher die
+// aktuelle Version-ID geholt, sonst lehnt GitHub das Ueberschreiben ab.
+async function githubDateiSchreiben(pfad, blob, nachricht, ueberschreiben = false) {
+  const apiUrl = `${GITHUB_API_BASIS}/${pfad}`
+  let sha
+  if (ueberschreiben) {
+    const bestehend = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
+    })
+    if (bestehend.ok) sha = (await bestehend.json()).sha
+  }
+
+  const inhalt = await blobZuBase64(blob)
+  const antwort = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: nachricht, content: inhalt, branch: GITHUB_BRANCH, ...(sha ? { sha } : {}) }),
+  })
+
+  if (!antwort.ok) {
+    const fehler = await antwort.json().catch(() => ({}))
+    throw new Error('GitHub: ' + (fehler.message || antwort.status))
+  }
+
+  return `${GITHUB_ROH_BASIS}/${pfad}`
+}
+
 // ─── Hero / title image ───────────────────────────────────────────────────────
-const TITELBILD_DATEI = 'titelbild'
+const TITELBILD_PFAD = 'images/titelbild.jpg'
 
 function ladeTitelbild() {
   const img = document.getElementById('hero-bild')
   if (!img) return
-  const url = client.storage.from('SammlungBilder').getPublicUrl(TITELBILD_DATEI).data.publicUrl
   img.onload  = () => img.classList.add('geladen')
   img.onerror = () => img.classList.remove('geladen')
-  img.src = url + '?v=' + Date.now()
+  img.src = `${GITHUB_ROH_BASIS}/${TITELBILD_PFAD}?v=${Date.now()}`
 }
 
 async function titelbildHochladen(datei) {
@@ -418,11 +464,10 @@ async function titelbildHochladen(datei) {
   statusSetzen('Titelbild wird verkleinert…')
   const klein = await bildVerkleinern(datei, 2000)
   statusSetzen('Titelbild wird hochgeladen…')
-  const { error } = await client.storage
-    .from('SammlungBilder')
-    .upload(TITELBILD_DATEI, klein, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' })
-  if (error) {
-    statusSetzen('Fehler beim Titelbild: ' + error.message, 'err')
+  try {
+    await githubDateiSchreiben(TITELBILD_PFAD, klein, 'Titelbild aktualisiert', true)
+  } catch (err) {
+    statusSetzen('Fehler beim Titelbild: ' + err.message, 'err')
     return
   }
   statusSetzen('✓ Titelbild gespeichert', 'ok')
@@ -439,11 +484,11 @@ async function bildHochladen(datei) {
 
   const basisName  = datei.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_')
   const dateiname  = `${Date.now()}-${Math.random().toString(36).slice(2)}-${basisName}.jpg`
-  const { error } = await client.storage
-    .from('SammlungBilder')
-    .upload(dateiname, klein, { contentType: 'image/jpeg', cacheControl: '3600' })
-  if (error) throw new Error('Bild-Upload: ' + error.message)
-  return client.storage.from('SammlungBilder').getPublicUrl(dateiname).data.publicUrl
+  try {
+    return await githubDateiSchreiben(`images/${dateiname}`, klein, `Foto hinzugefügt: ${dateiname}`)
+  } catch (err) {
+    throw new Error('Bild-Upload: ' + err.message)
+  }
 }
 
 // ─── Save new bottle ──────────────────────────────────────────────────────────
