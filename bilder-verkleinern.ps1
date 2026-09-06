@@ -52,8 +52,27 @@ foreach ($d in $dateien) {
         continue
     }
 
-    # Schon klein genug -> unveraendert lassen, kein Qualitaetsverlust
-    if ([Math]::Max($bild.Width, $bild.Height) -le $MaxKante -and $d.Length -le 400KB) {
+    # EXIF-Drehung auslesen. Handys speichern Hochformat oft als Querformat
+    # plus Drehvermerk. Beim Neuzeichnen geht der Vermerk verloren, also muessen
+    # die Pixel selbst gedreht werden - sonst liegen die Bilder auf der Seite.
+    $ori = 1
+    if ($bild.PropertyIdList -contains 0x0112) {
+        try { $ori = [BitConverter]::ToUInt16($bild.GetPropertyItem(0x0112).Value, 0) } catch { $ori = 1 }
+    }
+    $drehung = switch ($ori) {
+        2 { [System.Drawing.RotateFlipType]::RotateNoneFlipX }
+        3 { [System.Drawing.RotateFlipType]::Rotate180FlipNone }
+        4 { [System.Drawing.RotateFlipType]::Rotate180FlipX }
+        5 { [System.Drawing.RotateFlipType]::Rotate90FlipX }
+        6 { [System.Drawing.RotateFlipType]::Rotate90FlipNone }
+        7 { [System.Drawing.RotateFlipType]::Rotate270FlipX }
+        8 { [System.Drawing.RotateFlipType]::Rotate270FlipNone }
+        default { $null }
+    }
+
+    # Schon klein genug UND ungedreht -> unveraendert lassen
+    if ($null -eq $drehung -and
+        [Math]::Max($bild.Width, $bild.Height) -le $MaxKante -and $d.Length -le 400KB) {
         $bild.Dispose()
         Copy-Item $d.FullName $zielPfad -Force
         $nachherBytes += $d.Length
@@ -62,6 +81,7 @@ foreach ($d in $dateien) {
     }
 
     try {
+        if ($null -ne $drehung) { $bild.RotateFlip($drehung) }
         $faktor = [Math]::Min(1.0, $MaxKante / [Math]::Max($bild.Width, $bild.Height))
         $breite = [int][Math]::Round($bild.Width  * $faktor)
         $hoehe  = [int][Math]::Round($bild.Height * $faktor)

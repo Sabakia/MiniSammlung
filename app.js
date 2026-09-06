@@ -79,7 +79,7 @@ async function flaschenSpeichernNachGitHub(nachricht) {
   const apiUrl = `${GITHUB_API_BASIS}/${DATEN_PFAD}`
 
   const aktuell = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}&v=${Date.now()}`, {
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${tokenLesen()}`, Accept: 'application/vnd.github+json' },
     cache: 'no-store',
   })
   if (!aktuell.ok) throw new Error('Konnte aktuelle Daten nicht lesen (HTTP ' + aktuell.status + ')')
@@ -91,7 +91,7 @@ async function flaschenSpeichernNachGitHub(nachricht) {
   const antwort = await fetch(apiUrl, {
     method: 'PUT',
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${tokenLesen()}`,
       Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json',
     },
@@ -297,6 +297,9 @@ function bildVerkleinern(datei, maxKante = MAX_KANTE) {
 
     img.onload = () => {
       URL.revokeObjectURL(objektUrl)
+      // Die EXIF-Drehung wenden Browser bei <img> von sich aus an - width und
+      // height sind also bereits die gedrehten Masse. Nicht selbst nachdrehen,
+      // sonst liegen die Bilder hinterher quer.
       const faktor = Math.min(1, maxKante / Math.max(img.width, img.height))
       const breite = Math.round(img.width  * faktor)
       const hoehe  = Math.round(img.height * faktor)
@@ -342,7 +345,7 @@ async function githubDateiSchreiben(pfad, blob, nachricht, ueberschreiben = fals
   let sha
   if (ueberschreiben) {
     const bestehend = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, {
-      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' }
+      headers: { Authorization: `Bearer ${tokenLesen()}`, Accept: 'application/vnd.github+json' }
     })
     if (bestehend.ok) sha = (await bestehend.json()).sha
   }
@@ -351,7 +354,7 @@ async function githubDateiSchreiben(pfad, blob, nachricht, ueberschreiben = fals
   const antwort = await fetch(apiUrl, {
     method: 'PUT',
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${tokenLesen()}`,
       Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json',
     },
@@ -628,24 +631,40 @@ function fotoVorschauUrls(urls) {
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
-// Hinweis: Das ist eine Bequemlichkeitshuerde, kein echter Schutz. Der
-// GitHub-Token liegt ohnehin offen im Quelltext — wer ihn dort findet, kaeme
-// auch ohne dieses Passwort ans Repo. Es verhindert nur versehentliche
-// Aenderungen durch Besucher.
-const ADMIN_HASH = ADMIN_PASSWORT_HASH   // aus github-config.js
+// Der GitHub-Token ist gleichzeitig der Schluessel und der Nachweis: Wer ihn
+// hat, darf schreiben. Er wird nur im Browser gespeichert, nie im Repo — sonst
+// wuerde GitHub ihn beim naechsten Durchlauf seiner Suche ungueltig machen.
+const TOKEN_SCHLUESSEL = 'mmb-github-token'
 
-async function passwortHash(text) {
-  const roh = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-  return [...new Uint8Array(roh)].map(b => b.toString(16).padStart(2, '0')).join('')
+function tokenLesen() {
+  try { return localStorage.getItem(TOKEN_SCHLUESSEL) || '' } catch { return '' }
+}
+
+function tokenSchreiben(wert) {
+  try {
+    if (wert) localStorage.setItem(TOKEN_SCHLUESSEL, wert)
+    else      localStorage.removeItem(TOKEN_SCHLUESSEL)
+  } catch { /* privater Modus — gilt dann nur bis zum Neuladen */ }
+}
+
+// Prueft den Token gegen GitHub und stellt sicher, dass er auch wirklich
+// in dieses Repo schreiben darf.
+async function tokenPruefen(token) {
+  const antwort = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`,
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } }
+  )
+  if (antwort.status === 401) throw new Error('Token ungültig oder widerrufen.')
+  if (!antwort.ok)            throw new Error('GitHub antwortet mit ' + antwort.status)
+
+  const repo = await antwort.json()
+  if (!repo.permissions?.push) throw new Error('Token darf in dieses Repo nicht schreiben.')
 }
 
 function adminSetzen(an) {
   istAdmin = an
   updateAuthUI(an)
-  try {
-    if (an) sessionStorage.setItem('mmb-admin', '1')
-    else    sessionStorage.removeItem('mmb-admin')
-  } catch { /* privater Modus — dann gilt es nur fuer diese Seite */ }
+  if (!an) tokenSchreiben('')
 }
 
 function initAuthEvents() {
@@ -664,22 +683,23 @@ function initAuthEvents() {
     e.preventDefault()
     const btn   = document.getElementById('login-submit')
     const alert = document.getElementById('login-alert')
-    const pass  = document.getElementById('login-password').value
+    const token = document.getElementById('login-password').value.trim()
 
     btn.disabled      = true
-    btn.textContent   = 'Anmelden…'
+    btn.textContent   = 'Prüfe…'
     alert.textContent = ''
 
-    const stimmt = (await passwortHash(pass)) === ADMIN_HASH
-
-    if (stimmt) {
+    try {
+      await tokenPruefen(token)
+      tokenSchreiben(token)
       adminSetzen(true)
       loginModalSchliessen()
       statusSetzen('✓ Angemeldet', 'ok')
-    } else {
-      alert.textContent = 'Falsches Passwort.'
+    } catch (err) {
+      alert.textContent = err.message
       alert.className   = 'form-alert err'
     }
+
     btn.disabled    = false
     btn.textContent = 'Anmelden'
   })
@@ -934,10 +954,18 @@ function detailOeffnen(id) {
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('flaschen-grid').innerHTML = ''
 
-  // Anmeldung gilt bis der Tab geschlossen wird
-  let warAdmin = false
-  try { warAdmin = sessionStorage.getItem('mmb-admin') === '1' } catch { /* ignorieren */ }
-  adminSetzen(warAdmin)
+  // Gespeicherten Token pruefen — er kann zwischenzeitlich abgelaufen sein
+  adminSetzen(false)
+  const gespeichert = tokenLesen()
+  if (gespeichert) {
+    try {
+      await tokenPruefen(gespeichert)
+      adminSetzen(true)
+    } catch {
+      tokenSchreiben('')
+      statusSetzen('Token nicht mehr gültig — bitte neu anmelden.', 'err')
+    }
+  }
 
   ladeTitelbild()
   await ladeFlaschen()

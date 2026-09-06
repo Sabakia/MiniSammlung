@@ -218,8 +218,15 @@
       </div>
       <form id="login-form" class="modal-form" novalidate>
         <div class="form-row">
-          <label>Passwort</label>
-          <input type="password" id="login-password" autocomplete="current-password">
+          <label>GitHub-Token</label>
+          <input type="password" id="login-password" autocomplete="off"
+                 placeholder="github_pat_…" spellcheck="false">
+          <span class="hint" style="display:block;margin-top:6px;line-height:1.5">
+            Wird nur in diesem Browser gespeichert, nie hochgeladen.
+            Neu erstellen unter github.com → Settings → Developer settings →
+            Fine-grained tokens, mit Zugriff auf <strong>Sammlung-</strong>
+            und Contents auf <strong>Read and write</strong>.
+          </span>
         </div>
         <div class="form-actions">
           <button type="submit" id="login-submit" class="btn-primaer">Anmelden</button>
@@ -231,7 +238,7 @@
 
   <!-- Versionsangabe: bei Aenderungen hochzaehlen, damit Browser
        nicht die alte Fassung aus dem Zwischenspeicher ausfuehren -->
-  <script src="github-config.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="github-config.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
