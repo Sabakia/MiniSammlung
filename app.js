@@ -667,22 +667,40 @@ function tokenSchreiben(wert) {
 
 // Prueft den Token gegen GitHub und stellt sicher, dass er auch wirklich
 // in dieses Repo schreiben darf.
+// Wirft einen Fehler mit .abgelehnt = true, wenn GitHub den Token wirklich
+// zurueckweist. Bei Netzproblemen fehlt die Kennzeichnung - dann darf der
+// gespeicherte Token nicht geloescht werden.
 async function tokenPruefen(token) {
   const antwort = await fetch(
     `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } }
   )
-  if (antwort.status === 401) throw new Error('Token ungültig oder widerrufen.')
-  if (!antwort.ok)            throw new Error('GitHub antwortet mit ' + antwort.status)
+
+  if (antwort.status === 401 || antwort.status === 403 || antwort.status === 404) {
+    const f = new Error('Token ungültig, widerrufen oder ohne Zugriff auf das Repo.')
+    f.abgelehnt = true
+    throw f
+  }
+  if (!antwort.ok) throw new Error('GitHub antwortet mit ' + antwort.status)
 
   const repo = await antwort.json()
-  if (!repo.permissions?.push) throw new Error('Token darf in dieses Repo nicht schreiben.')
+  if (!repo.permissions?.push) {
+    const f = new Error('Token darf in dieses Repo nicht schreiben.')
+    f.abgelehnt = true
+    throw f
+  }
 }
 
+// Setzt nur Zustand und Oberflaeche. Den Token loescht ausschliesslich das
+// Abmelden - sonst wuerde schon der Start-Aufruf ihn wegraeumen.
 function adminSetzen(an) {
   istAdmin = an
   updateAuthUI(an)
-  if (!an) tokenSchreiben('')
+}
+
+function abmelden() {
+  tokenSchreiben('')
+  adminSetzen(false)
 }
 
 function initAuthEvents() {
@@ -693,7 +711,7 @@ function initAuthEvents() {
   })
 
   document.getElementById('logout-btn').addEventListener('click', () => {
-    adminSetzen(false)
+    abmelden()
     statusSetzen('Abgemeldet', '')
   })
 
@@ -982,9 +1000,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await tokenPruefen(gespeichert)
       adminSetzen(true)
-    } catch {
-      tokenSchreiben('')
-      statusSetzen('Token nicht mehr gültig — bitte neu anmelden.', 'err')
+    } catch (err) {
+      if (err.abgelehnt) {
+        tokenSchreiben('')
+        statusSetzen('Token nicht mehr gültig — bitte neu anmelden.', 'err')
+      } else {
+        // Netzproblem: Token behalten, nur nicht als angemeldet gelten
+        statusSetzen('Anmeldung nicht prüfbar — Token bleibt gespeichert.', '')
+      }
     }
   }
 
