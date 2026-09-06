@@ -102,7 +102,13 @@ async function flaschenSpeichernNachGitHub(nachricht) {
     const fehler = await antwort.json().catch(() => ({}))
     throw new Error('Speichern: ' + (fehler.message || antwort.status))
   }
-  datenSha = (await antwort.json()).content.sha
+
+  const ergebnis = await antwort.json()
+  if (!ergebnis?.content?.sha) {
+    throw new Error('Speichern: GitHub hat keine Bestätigung geliefert.')
+  }
+  datenSha = ergebnis.content.sha
+  return ergebnis.commit?.sha
 }
 
 function updateGesamtAnzahl() {
@@ -819,7 +825,10 @@ function initEvents() {
         statusSetzen('✓ ' + name + ' gespeichert', 'ok')
       }
 
-      await ladeFlaschen()
+      // Kein Neuladen von GitHub: dessen Zwischenspeicher liefert minutenlang
+      // die alte Fassung und wuerde die gerade gespeicherte Aenderung wieder
+      // ueberschreiben. Der Stand im Speicher ist bereits der richtige.
+      updateGesamtAnzahl()
       renderKategorien()
       renderFlaschen()
       modalSchliessen()
