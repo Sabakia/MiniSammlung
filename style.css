@@ -41,6 +41,10 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* Verhindert seitliches Verrutschen, wenn ein Element ueber den Rand ragt */
+  overflow-x: hidden;
+  /* Kein Groesser-Zoomen des Textes beim Drehen des Geraets */
+  -webkit-text-size-adjust: 100%;
 }
 
 /* ============================================================
@@ -1241,11 +1245,126 @@ main { padding: 1px; }
    RESPONSIVE
    ============================================================ */
 
-@media (max-width: 480px) {
-  .galerie-overlay { padding: 1.5rem 1rem 1.5rem; }
-  .suchleiste,
-  .neuleiste,
-  .kategorieleiste { padding-left: 1rem; padding-right: 1rem; }
-  .infoleiste { padding: 8px 1rem; }
+/* ── Geraete ohne echten Mauszeiger ───────────────────────────────────────────
+   Alles was per :hover erscheint, ist auf dem Handy unerreichbar. Fuer
+   Angemeldete deshalb dauerhaft einblenden, sonst kaeme man an Bearbeiten
+   und Foto-Knopf gar nicht heran.                                           */
+@media (hover: none) {
+  .admin .flasche-karte .edit-btn,
+  .admin .flasche-karte .admin-foto-btn {
+    display: flex;
+    opacity: 1;
+  }
+
+  /* Groesser, damit man sie mit dem Daumen trifft */
+  .edit-btn {
+    width: 40px; height: 40px;
+    font-size: 16px;
+    top: 6px; right: 6px;
+  }
+  .admin-foto-btn {
+    padding: 9px 13px;
+    font-size: 12px;
+  }
+
+  .flasche-karte:hover .karte-bild { transform: none; }
+}
+
+@media (max-width: 640px) {
+  /* Hero kuerzen — sonst fuellt er auf dem Handy den halben Bildschirm */
+  .galerie-hero {
+    height: 46vh;
+    min-height: 260px;
+  }
+  .galerie-overlay {
+    padding: 1.25rem 1rem 1.25rem;
+    align-items: flex-end;
+  }
+  .galerie-name { font-size: clamp(2.25rem, 11vw, 3.25rem); }
+  .galerie-count strong { font-size: clamp(1.5rem, 7vw, 2.25rem); }
+
+  /* Kopfbereich kompakter, er ist klebend und kostet sonst zu viel Platz */
+  .suchleiste      { padding: 8px 1rem 6px; }
+  .kategorieleiste { padding: 0 1rem 8px; }
+  .neuleiste       { padding: 6px 1rem 8px; }
+  .infoleiste      { padding: 7px 1rem; }
+
+  /* Andeuten, dass die Kategorien seitlich weitergehen */
+  .kategorieleiste {
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+
+  .kat-pill { padding: 8px 11px; }
+
   .flaschen-grid { grid-template-columns: repeat(2, 1fr); }
+  .karte-overlay { padding: 10px 10px 11px; }
+  .karte-extra   { padding: 10px; }
+
+  /* Bedienelemente auf Fingergroesse */
+  .btn-neu, .btn-login, .btn-logout, .btn-info { padding: 9px 14px; }
+
+  /* Fenster nutzen die Flaeche besser, mit Rand fuer Notch und Home-Leiste */
+  .modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+  .modal {
+    max-width: none;
+    border: none;
+    border-radius: 0;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .modal-header { padding: 1rem 1rem .85rem; }
+  .modal-header h2 { font-size: 1.35rem; }
+  .modal-form   { padding: 1rem 1rem 1.5rem; }
+
+  /* Unter 16px zoomt iOS beim Antippen ins Formular hinein */
+  .form-row input,
+  .form-row select,
+  .form-row textarea {
+    font-size: 16px;
+    padding: 11px 12px;
+  }
+
+  /* Aktionen bleiben in Reichweite, statt ans Seitenende zu rutschen */
+  .form-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--s2);
+    padding: 12px 0 4px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    z-index: 2;
+  }
+  .form-actions button { flex: 1; padding: 12px 16px; }
+
+  .foto-vorschau-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Detailbilder als volle Breite zum Durchwischen */
+  .detail-bilder {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .detail-bilder img {
+    scroll-snap-align: center;
+    height: 62vw;
+    max-height: 340px;
+  }
+
+  .modal-close { width: 40px; height: 40px; font-size: 18px; }
+
+  /* Drei-Punkte-Menue leichter treffen */
+  .hero-menue-btn { width: 40px; height: 40px; }
+  .hero-menue-liste button { padding: 13px 15px; }
+}
+
+/* Sehr schmale Geraete */
+@media (max-width: 360px) {
+  .galerie-name { font-size: 2rem; }
+  .kat-pill     { font-size: 10px; padding: 7px 9px; }
 }
