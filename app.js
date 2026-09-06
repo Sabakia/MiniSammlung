@@ -86,7 +86,7 @@ async function flaschenSpeichernNachGitHub(nachricht) {
   datenSha = (await aktuell.json()).sha
 
   const text   = JSON.stringify(alleFlaschen, null, 1)
-  const inhalt = btoa(String.fromCharCode(...new TextEncoder().encode(text)))
+  const inhalt = textZuBase64(text)
 
   const antwort = await fetch(apiUrl, {
     method: 'PUT',
@@ -328,6 +328,18 @@ function bildVerkleinern(datei, maxKante = MAX_KANTE) {
 // Risiko fuer Bildergroessen in dieser Groessenordnung nicht.
 const GITHUB_API_BASIS = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents`
 const GITHUB_ROH_BASIS = `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/${GITHUB_BRANCH}`
+
+// Blockweise umwandeln. Alles auf einmal per Spread an fromCharCode zu geben
+// sprengt bei Dateien dieser Groesse den Aufrufstapel.
+function textZuBase64(text) {
+  const bytes = new TextEncoder().encode(text)
+  const BLOCK = 0x8000
+  let binaer  = ''
+  for (let i = 0; i < bytes.length; i += BLOCK) {
+    binaer += String.fromCharCode.apply(null, bytes.subarray(i, i + BLOCK))
+  }
+  return btoa(binaer)
+}
 
 function blobZuBase64(blob) {
   return new Promise((resolve, reject) => {
