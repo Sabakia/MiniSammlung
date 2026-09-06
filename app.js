@@ -100,6 +100,14 @@ async function flaschenSpeichernNachGitHub(nachricht) {
 
   if (!antwort.ok) {
     const fehler = await antwort.json().catch(() => ({}))
+    if (antwort.status === 403 || antwort.status === 404) {
+      throw new Error(
+        `Der Token darf in ${GITHUB_REPO_NAME} nicht schreiben. ` +
+        'Auf github.com unter Settings → Developer settings → Fine-grained tokens ' +
+        `prüfen, ob ${GITHUB_REPO_NAME} in der Repo-Auswahl steht und ` +
+        '"Contents" auf "Read and write" gesetzt ist.'
+      )
+    }
     throw new Error('Speichern: ' + (fehler.message || antwort.status))
   }
 
@@ -683,12 +691,10 @@ async function tokenPruefen(token) {
   }
   if (!antwort.ok) throw new Error('GitHub antwortet mit ' + antwort.status)
 
-  const repo = await antwort.json()
-  if (!repo.permissions?.push) {
-    const f = new Error('Token darf in dieses Repo nicht schreiben.')
-    f.abgelehnt = true
-    throw f
-  }
+  // Achtung: repo.permissions beschreibt die Rechte des KONTOS, nicht die des
+  // Tokens - und oeffentliche Repos darf ohnehin jeder Token lesen. Ob wirklich
+  // geschrieben werden darf, zeigt sich erst beim Schreiben. Deshalb hier keine
+  // Aussage darueber; die Speicherfunktion meldet es verstaendlich.
 }
 
 // Setzt nur Zustand und Oberflaeche. Den Token loescht ausschliesslich das
