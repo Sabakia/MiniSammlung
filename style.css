@@ -1292,8 +1292,21 @@ main { padding: 1px; }
   /* Andeuten, dass die Kategorien seitlich weitergehen */
   .kategorieleiste {
     -webkit-overflow-scrolling: touch;
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+            mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
   }
+
+  /* Ohne Titelbild ist der Hero nur dunkle Flaeche — dann deutlich kuerzen,
+     damit die Flaschen nicht erst nach halbem Bildschirm anfangen */
+  .galerie-hero:not(:has(.hero-bild.geladen)) {
+    height: auto;
+    min-height: 0;
+  }
+  .galerie-hero:not(:has(.hero-bild.geladen)) .galerie-overlay {
+    position: static;
+    padding-top: 2rem;
+  }
+  .galerie-hero:not(:has(.hero-bild.geladen)) .fade-bottom { display: none; }
 
   .kat-pill { padding: 8px 11px; }
 
