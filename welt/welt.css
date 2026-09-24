@@ -251,7 +251,8 @@ body.nebel .l-offen { background: rgba(242,234,216,.6); box-shadow: 0 0 8px rgba
 .karte-zu:hover, .karte-zu:focus-visible { background: rgba(242,234,216,.08); color: var(--cream); outline: none; }
 
 .karte-kopf { display: flex; align-items: center; gap: 14px; padding-right: 30px; }
-.flagge { font-size: 44px; line-height: 1; filter: drop-shadow(0 4px 12px rgba(0,0,0,.5)); }
+.flagge { font-size: 40px; line-height: 1; display: flex; filter: drop-shadow(0 4px 12px rgba(0,0,0,.5)); }
+.flagge .fl { border-radius: 5px; }
 .karte-kontinent { font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--amber); font-weight: 600; }
 .karte-kopf h2 { font-family: var(--font-display); font-size: 30px; font-weight: 600; color: var(--cream); line-height: 1.05; }
 
@@ -429,6 +430,9 @@ body.nebel .l-offen { background: rgba(242,234,216,.6); box-shadow: 0 0 8px rgba
 }
 .laden.fertig { opacity: 0; visibility: hidden; }
 .laden small { letter-spacing: .04em; text-transform: none; }
+.fl { display: inline-block; width: 1.33em; height: 1em; object-fit: cover; border-radius: 3px; vertical-align: -0.12em; box-shadow: 0 0 0 1px rgba(242,234,216,.12); }
+.fl-leer { background: rgba(242,234,216,.1); }
+
 .laden-globus {
   width: 64px; height: 64px; border-radius: 50%;
   border: 1px solid var(--amber);
