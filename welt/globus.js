@@ -12,6 +12,9 @@ const FARBEN = {
   nebelBekannt: 'rgba(40,32,26,0.55)',
   rand:         'rgba(242,234,216,0.16)',
   randAuswahl:  'rgba(255,240,210,0.95)',
+  besuchtAuswahl: 'rgba(255,196,110,1)',
+  wunschAuswahl:  'rgba(125,215,202,0.95)',
+  offenAuswahl:   'rgba(242,234,216,0.42)',
   atmosphaere:  '#c17f3a',
 }
 
@@ -78,6 +81,7 @@ function statusVon(land) {
 
 function kappenFarbe(land) {
   const s = statusVon(land)
+  if (land === ausgewaehlt) return s === 'wunsch' ? FARBEN.wunschAuswahl : s === 'besucht' ? FARBEN.besuchtAuswahl : FARBEN.offenAuswahl
   if (nebelModus) return s === 'besucht' ? FARBEN.nebelBekannt : FARBEN.nebelOffen
   if (s === 'besucht') return FARBEN.besucht
   if (s === 'wunsch')  return FARBEN.wunsch
@@ -171,9 +175,11 @@ function globusAktualisieren() {
     .polygonStrokeColor(l => (l === ausgewaehlt ? FARBEN.randAuswahl : FARBEN.rand))
 }
 
+// globe.gl haengt eigene 3D-Objekte an die uebergebenen Daten. Deshalb nur
+// Kopien uebergeben, sonst landen diese Objekte in der gespeicherten Datei.
 function orteZeigen(orte) {
   if (!globus) return
-  globus.htmlElementsData(orte).ringsData(orte)
+  globus.htmlElementsData(orte.map(o => ({ ...o }))).ringsData(orte.map(o => ({ ...o })))
 }
 
 function landAuswaehlen(land) {
