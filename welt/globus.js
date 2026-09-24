@@ -151,7 +151,7 @@ function globusErstellen(container, { beiLandKlick, beiGlobusKlick, beiOrtKlick 
 
   globusMaterialSetzen()
   const steuerung = globus.controls()
-  steuerung.autoRotate = true
+  steuerung.autoRotate = false
   steuerung.autoRotateSpeed = 0.35
   steuerung.enableDamping = true
   globus.pointOfView({ lat: 30, lng: 10, altitude: 2.4 })
