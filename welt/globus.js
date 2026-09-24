@@ -42,6 +42,28 @@ function landMitte(geometrie) {
   }
 }
 
+// Strahl-Test in Laengen-/Breitengrad-Ebene; reicht, da die Daten an der
+// Datumsgrenze bereits geteilt sind.
+function punktImRing(lng, lat, ring) {
+  let drin = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) drin = !drin
+  }
+  return drin
+}
+
+function punktImLand(lng, lat, geometrie) {
+  const polygone = geometrie.type === 'Polygon' ? [geometrie.coordinates] : geometrie.coordinates
+  return polygone.some(([aussen, ...loecher]) =>
+    punktImRing(lng, lat, aussen) && !loecher.some(r => punktImRing(lng, lat, r)))
+}
+
+function landAnPunkt(lat, lng) {
+  return alleLaender.find(l => punktImLand(lng, lat, l.feature.geometry))?.code || ''
+}
+
 // Als Bild statt Emoji: Windows zeigt Flaggen-Emojis nur als zwei Buchstaben.
 // Der Code ist per Regex geprueft, daher ist das HTML sicher.
 const FLAGGEN_BASIS = 'https://cdn.jsdelivr.net/npm/flag-icons@7/flags/4x3'
