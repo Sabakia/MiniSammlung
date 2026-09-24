@@ -78,7 +78,7 @@ function statusVon(land) {
 
 function kappenFarbe(land) {
   const s = statusVon(land)
-  if (nebelModus) return s ? FARBEN.nebelBekannt : FARBEN.nebelOffen
+  if (nebelModus) return s === 'besucht' ? FARBEN.nebelBekannt : FARBEN.nebelOffen
   if (s === 'besucht') return FARBEN.besucht
   if (s === 'wunsch')  return FARBEN.wunsch
   return FARBEN.offen
