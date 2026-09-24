@@ -357,7 +357,6 @@ async function start() {
   try {
     await Promise.all([laenderLaden(), reiseLaden()])
     globusErstellen($('globus'), { beiLandKlick, beiGlobusKlick, beiOrtKlick: ortAngeklickt })
-    $('btn-drehen').classList.add('aktiv')
     allesNeuZeichnen()
     $('laden').classList.add('fertig')
   } catch (err) {
