@@ -516,3 +516,4 @@ body.nur-ansicht .karte-felder textarea { background: transparent; border-color:
 body.nur-ansicht .sync { cursor: pointer; transition: color .2s, box-shadow .2s; }
 body.nur-ansicht .sync:hover { color: var(--amber-2); box-shadow: var(--schatten), inset 0 0 0 1px var(--amber); }
 .sync[data-zustand="ansicht"] .sync-punkt { background: var(--muted); }
+body.nur-ansicht .karte-felder ::placeholder { color: transparent; }
