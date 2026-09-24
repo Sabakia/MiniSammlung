@@ -39,9 +39,13 @@ function landMitte(geometrie) {
   }
 }
 
+// Als Bild statt Emoji: Windows zeigt Flaggen-Emojis nur als zwei Buchstaben.
+// Der Code ist per Regex geprueft, daher ist das HTML sicher.
+const FLAGGEN_BASIS = 'https://cdn.jsdelivr.net/npm/flag-icons@7/flags/4x3'
+
 function flaggeAus(iso2) {
-  if (!/^[A-Z]{2}$/.test(iso2 || '')) return '🏳️'
-  return String.fromCodePoint(...[...iso2].map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
+  if (!/^[A-Z]{2}$/.test(iso2 || '')) return '<span class="fl fl-leer"></span>'
+  return `<img class="fl" src="${FLAGGEN_BASIS}/${iso2.toLowerCase()}.svg" alt="" loading="lazy">`
 }
 
 // Rohes GeoJSON-Feature → schlankes Land-Objekt fuer die Oberflaeche.
@@ -60,7 +64,7 @@ function landAusFeature(f) {
 }
 
 async function laenderLaden() {
-  const antwort = await fetch('laender.json?v=1')
+  const antwort = await fetch('laender.json?v=3')
   if (!antwort.ok) throw new Error('Länderdaten fehlen (HTTP ' + antwort.status + ')')
   const geo = await antwort.json()
   alleLaender = geo.features.map(landAusFeature)
