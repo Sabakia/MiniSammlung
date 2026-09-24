@@ -94,7 +94,7 @@ function renderStatistik() {
 function landKarteOeffnen(land) {
   aktivesLand = land
   const eintrag = reise.laender[land.code] || {}
-  $('k-flagge').textContent    = land.flagge
+  $('k-flagge').innerHTML      = land.flagge
   $('k-name').textContent      = land.name
   $('k-kontinent').textContent = kontinentName(land.kontinent)
   $('k-jahr').value  = eintrag.jahr  || ''
