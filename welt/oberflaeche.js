@@ -212,8 +212,8 @@ function pinModusSetzen(an) {
   if (an) drehenSetzen(false)
 }
 
-function ortDialogOeffnen(koord) {
-  wartenderOrt = koord
+function ortDialogOeffnen(koord, land = null) {
+  wartenderOrt = { lat: koord.lat, lng: koord.lng, code: land?.code || '' }
   $('ort-koord').textContent = `${koord.lat.toFixed(2)}°, ${koord.lng.toFixed(2)}°`
   $('ort-dialog').classList.add('offen')
   $('ort-name').value = ''
@@ -229,11 +229,15 @@ function ortSpeichern(e) {
   e.preventDefault()
   const name = $('ort-name').value.trim()
   if (!name || !wartenderOrt) return
-  ortHinzufuegen(name, wartenderOrt.lat, wartenderOrt.lng)
+  const code = wartenderOrt.code || landAnPunkt(wartenderOrt.lat, wartenderOrt.lng)
+  const land = alleLaender.find(l => l.code === code)
+  ortHinzufuegen(name, wartenderOrt.lat, wartenderOrt.lng, code)
   ortDialogSchliessen()
   pinModusSetzen(false)
   allesNeuZeichnen()
-  toast(`📍 <strong>${esc(name)}</strong> markiert`)
+  toast(land
+    ? `📍 <strong>${esc(name)}</strong> markiert · ${land.flagge} ${esc(land.name)} ist jetzt besucht`
+    : `📍 <strong>${esc(name)}</strong> markiert`)
 }
 
 function ortAngeklickt(ort) {
@@ -242,7 +246,7 @@ function ortAngeklickt(ort) {
 
 // ─── Globus-Rueckrufe ────────────────────────────────────────────────────────
 function beiLandKlick(land, koord) {
-  if (pinModus) { ortDialogOeffnen(koord); return }
+  if (pinModus) { ortDialogOeffnen(koord, land); return }
   if (land) landKarteOeffnen(land)
 }
 
@@ -356,6 +360,7 @@ async function start() {
   initWerkzeuge(); initKarte(); initListe(); initDialog()
   try {
     await Promise.all([laenderLaden(), reiseLaden()])
+    orteLaenderNachtragen(landAnPunkt)
     globusErstellen($('globus'), { beiLandKlick, beiGlobusKlick, beiOrtKlick: ortAngeklickt })
     allesNeuZeichnen()
     $('laden').classList.add('fertig')
