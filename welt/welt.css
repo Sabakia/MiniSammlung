@@ -499,3 +499,20 @@ body.nebel .l-offen { background: rgba(242,234,216,.6); box-shadow: 0 0 8px rgba
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ============================================================
+   NUR ANSICHT (nicht als Admin angemeldet)
+   ============================================================ */
+body.nur-ansicht #btn-pin,
+body.nur-ansicht .liste-fuss label,
+body.nur-ansicht .z-weg,
+body.nur-ansicht .toast-knopf,
+body.nur-ansicht .status-wahl button:not(.aktiv) { display: none; }
+
+body.nur-ansicht .status-wahl { grid-template-columns: 1fr; pointer-events: none; }
+body.nur-ansicht .karte-felder input,
+body.nur-ansicht .karte-felder textarea { background: transparent; border-color: transparent; padding-left: 0; resize: none; }
+
+body.nur-ansicht .sync { cursor: pointer; transition: color .2s, box-shadow .2s; }
+body.nur-ansicht .sync:hover { color: var(--amber-2); box-shadow: var(--schatten), inset 0 0 0 1px var(--amber); }
+.sync[data-zustand="ansicht"] .sync-punkt { background: var(--muted); }
