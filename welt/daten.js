@@ -51,7 +51,10 @@ function reiseBereinigen(roh) {
 
   sauber.orte = (Array.isArray(roh.orte) ? roh.orte : [])
     .filter(o => o && Number.isFinite(o.lat) && Number.isFinite(o.lng) && o.name)
-    .map(o => ({ id: String(o.id || neueId()), name: String(o.name).slice(0, 80), lat: o.lat, lng: o.lng }))
+    .map(o => ({
+      id: String(o.id || neueId()), name: String(o.name).slice(0, 80), lat: o.lat, lng: o.lng,
+      ...(typeof o.land === 'string' && /^([A-Z0-9]{3})?$/.test(o.land) ? { land: o.land } : {}),
+    }))
   return sauber
 }
 
@@ -117,9 +120,30 @@ function landSetzen(code, felder) {
   return reiseAendern({ ...reise, laender })
 }
 
-function ortHinzufuegen(name, lat, lng) {
-  const ort = { id: neueId(), name: name.trim().slice(0, 80), lat, lng }
-  return reiseAendern({ ...reise, orte: [...reise.orte, ort] })
+// Ein Ort in einem Land heisst: dort war ich. Das Land wird deshalb als
+// besucht markiert, sofern es noch keinen Status hat (Wunschziel bleibt nicht,
+// es wird zu besucht; "offen" gibt es als gespeicherten Status nicht).
+function landDurchOrt(laender, code) {
+  if (!code || laender[code]?.status === 'besucht') return laender
+  const alt = laender[code] || { jahr: '', notiz: '' }
+  return { ...laender, [code]: { ...alt, status: 'besucht' } }
+}
+
+function ortHinzufuegen(name, lat, lng, landCode = '') {
+  const ort = { id: neueId(), name: name.trim().slice(0, 80), lat, lng, land: landCode }
+  const laender = landDurchOrt(reise.laender, landCode)
+  return reiseAendern({ ...reise, laender, orte: [...reise.orte, ort] })
+}
+
+// Aeltere Orte kennen ihr Land noch nicht — einmalig nachtragen.
+function orteLaenderNachtragen(landAnPunkt) {
+  const ohneLand = reise.orte.filter(o => o.land === undefined)
+  if (!ohneLand.length) return reise
+  const orte = reise.orte.map(o => (o.land === undefined ? { ...o, land: landAnPunkt(o.lat, o.lng) } : o))
+  const laender = orte
+    .filter(o => ohneLand.some(alt => alt.id === o.id))
+    .reduce((l, o) => landDurchOrt(l, o.land), reise.laender)
+  return reiseAendern({ ...reise, laender, orte })
 }
 
 function ortEntfernen(id) {
