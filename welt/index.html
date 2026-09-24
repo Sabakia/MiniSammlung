@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0a07">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Weltkarte · Mini-Mini-Bar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="welt.css?v=1">
+</head>
+<body>
+
+  <!-- 3D-Globus füllt den ganzen Hintergrund -->
+  <div id="globus" class="globus" aria-label="3D-Weltkarte"></div>
+  <div class="sterne" aria-hidden="true"></div>
+
+  <!-- Kopfzeile -->
+  <header class="kopf">
+    <a href="../" class="zurueck" title="Zur Bar">← Bar</a>
+    <div class="titel">
+      <span class="titel-klein">Meine</span>
+      <h1>Weltreise</h1>
+    </div>
+    <div class="sync" id="sync" title="Speicherstatus">
+      <span class="sync-punkt"></span>
+      <span id="sync-text">Lade…</span>
+    </div>
+  </header>
+
+  <!-- Statistik -->
+  <section class="statistik" aria-label="Fortschritt">
+    <div class="stat-haupt">
+      <div class="ring" id="welt-ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-bahn" cx="60" cy="60" r="52"/>
+          <circle class="ring-wert" id="ring-wert" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="ring-text">
+          <strong id="stat-prozent">0%</strong>
+          <span>der Welt</span>
+        </div>
+      </div>
+      <div class="stat-zahlen">
+        <div><strong id="stat-besucht">0</strong><span>besucht</span></div>
+        <div><strong id="stat-wunsch">0</strong><span>Wunschziele</span></div>
+        <div><strong id="stat-offen">0</strong><span>unentdeckt</span></div>
+        <div><strong id="stat-orte">0</strong><span>Orte</span></div>
+      </div>
+    </div>
+    <div class="kontinente" id="kontinente"></div>
+  </section>
+
+  <!-- Werkzeugleiste -->
+  <nav class="werkzeuge" aria-label="Werkzeuge">
+    <button class="werkzeug" id="btn-liste" title="Länderliste"><span>☰</span><em>Länder</em></button>
+    <button class="werkzeug" id="btn-pin" title="Ort markieren"><span>📍</span><em>Ort setzen</em></button>
+    <button class="werkzeug" id="btn-nebel" title="Unentdecktes hervorheben"><span>◐</span><em>Unentdeckt</em></button>
+    <button class="werkzeug" id="btn-zufall" title="Zufälliges neues Ziel"><span>🎲</span><em>Nächstes Ziel</em></button>
+    <button class="werkzeug" id="btn-drehen" title="Automatisch drehen"><span>⟳</span><em>Drehen</em></button>
+  </nav>
+
+  <div class="pin-hinweis" id="pin-hinweis">Tippe auf den Globus, um einen Ort zu markieren · <button id="pin-abbrechen">Abbrechen</button></div>
+
+  <!-- Legende -->
+  <div class="legende" aria-hidden="true">
+    <span><i class="l-besucht"></i>Besucht</span>
+    <span><i class="l-wunsch"></i>Wunschziel</span>
+    <span><i class="l-offen"></i>Unentdeckt</span>
+  </div>
+
+  <!-- Karte eines Landes -->
+  <aside class="land-karte" id="land-karte" aria-live="polite">
+    <button class="karte-zu" id="karte-zu" aria-label="Schließen">✕</button>
+    <div class="karte-kopf">
+      <span class="flagge" id="k-flagge"></span>
+      <div>
+        <span class="karte-kontinent" id="k-kontinent"></span>
+        <h2 id="k-name"></h2>
+      </div>
+    </div>
+    <div class="status-wahl" role="radiogroup" aria-label="Status">
+      <button data-status="besucht" role="radio">✓ Besucht</button>
+      <button data-status="wunsch"  role="radio">★ Wunschziel</button>
+      <button data-status=""        role="radio">○ Offen</button>
+    </div>
+    <div class="karte-felder" id="karte-felder">
+      <label>Wann? <input type="text" id="k-jahr" placeholder="z. B. 2023" autocomplete="off"></label>
+      <label>Notiz <textarea id="k-notiz" rows="2" placeholder="Erinnerung, Lieblingsort, Mini-Flasche von dort …"></textarea></label>
+    </div>
+  </aside>
+
+  <!-- Seitenleiste: Länderliste -->
+  <aside class="liste" id="liste" aria-label="Länderliste">
+    <div class="liste-kopf">
+      <h2>Länder</h2>
+      <button class="karte-zu" id="liste-zu" aria-label="Schließen">✕</button>
+    </div>
+    <input type="search" id="liste-suche" placeholder="Land suchen…" autocomplete="off" spellcheck="false">
+    <div class="reiter" role="tablist">
+      <button data-filter="alle" class="aktiv">Alle</button>
+      <button data-filter="besucht">Besucht</button>
+      <button data-filter="wunsch">Wunsch</button>
+      <button data-filter="offen">Offen</button>
+      <button data-filter="orte">Orte</button>
+    </div>
+    <div class="liste-inhalt" id="liste-inhalt"></div>
+    <div class="liste-fuss">
+      <button id="btn-export" class="btn-leise">⬇ Export</button>
+      <label class="btn-leise">⬆ Import<input type="file" id="import-input" accept=".json" hidden></label>
+    </div>
+  </aside>
+
+  <!-- Dialog: Ort benennen -->
+  <div class="dialog-hintergrund" id="ort-dialog">
+    <form class="dialog" id="ort-form">
+      <h2>Ort markieren</h2>
+      <p class="dialog-koord" id="ort-koord"></p>
+      <input type="text" id="ort-name" placeholder="z. B. Lissabon, Strandbar in Split …" autocomplete="off" required maxlength="80">
+      <div class="dialog-aktionen">
+        <button type="button" id="ort-abbrechen" class="btn-leise">Abbrechen</button>
+        <button type="submit" class="btn-gold">Speichern</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="laden" id="laden">
+    <div class="laden-globus"></div>
+    <span>Die Welt wird geladen…</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.46.2/dist/globe.gl.min.js"></script>
+  <script src="../github-config.js?v=7"></script>
+  <script src="daten.js?v=1"></script>
+  <script src="globus.js?v=1"></script>
+  <script src="oberflaeche.js?v=1"></script>
+</body>
+</html>
