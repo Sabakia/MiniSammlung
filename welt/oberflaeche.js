@@ -34,11 +34,12 @@ function syncMelden(zustand, detail = '') {
     wartet:  'Speichert…',
     offline: 'Offline · lokal',
     fehler:  detail || 'Fehler beim Speichern',
+    ansicht: 'Nur Ansicht · Anmelden',
   }
   $('sync').dataset.zustand = zustand
   $('sync-text').textContent = texte[zustand] || zustand
-  $('sync').title = zustand === 'lokal'
-    ? 'In der Bar als Admin anmelden, dann wird die Karte auf allen Geräten synchronisiert.'
+  $('sync').title = zustand === 'ansicht'
+    ? 'Zum Bearbeiten in der Bar als Admin anmelden'
     : texte[zustand]
 }
 
@@ -123,7 +124,7 @@ function statusKnoepfe(status) {
 }
 
 function statusWaehlen(status) {
-  if (!aktivesLand) return
+  if (!aktivesLand || !istAdmin()) return
   landSetzen(aktivesLand.code, { status })
   statusKnoepfe(status)
   allesNeuZeichnen()
@@ -205,6 +206,7 @@ function listeKlick(e) {
 
 // ─── Orte / Pins ─────────────────────────────────────────────────────────────
 function pinModusSetzen(an) {
+  if (an && !istAdmin()) return
   pinModus = an
   $('btn-pin').classList.toggle('aktiv', an)
   $('pin-hinweis').classList.toggle('sichtbar', an)
@@ -241,6 +243,7 @@ function ortSpeichern(e) {
 }
 
 function ortAngeklickt(ort) {
+  if (!istAdmin()) { toast(`📍 <strong>${esc(ort.name)}</strong>`); return }
   toast(`📍 <strong>${esc(ort.name)}</strong> <button class="toast-knopf" data-ort-weg="${esc(ort.id)}">Entfernen</button>`)
 }
 
@@ -356,7 +359,17 @@ function initDialog() {
   })
 }
 
+// Besucher ohne Token sehen die Karte, koennen aber nichts aendern.
+function ansichtModusSetzen() {
+  const nurAnsicht = !istAdmin()
+  document.body.classList.toggle('nur-ansicht', nurAnsicht)
+  $('k-jahr').readOnly  = nurAnsicht
+  $('k-notiz').readOnly = nurAnsicht
+  if (nurAnsicht) $('sync').addEventListener('click', () => { location.href = '../' })
+}
+
 async function start() {
+  ansichtModusSetzen()
   initWerkzeuge(); initKarte(); initListe(); initDialog()
   try {
     await Promise.all([laenderLaden(), reiseLaden()])
