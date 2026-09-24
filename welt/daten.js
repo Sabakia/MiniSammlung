@@ -1,7 +1,7 @@
 // Reisedaten: welche Laender besucht / gewuenscht sind und selbst gesetzte Orte.
-// Gespeichert wird immer im Browser. Ist man in der Bar als Admin angemeldet
-// (gleicher GitHub-Token), wird zusaetzlich data/welt.json im Repo geschrieben,
-// damit die Karte auf jedem Geraet gleich aussieht.
+// Aendern darf nur, wer in der Bar als Admin angemeldet ist (gleicher
+// GitHub-Token). Dann wird im Browser und in data/welt.json im Repo gespeichert.
+// Alle anderen sehen nur den veroeffentlichten Stand und koennen nichts aendern.
 
 const WELT_PFAD        = 'data/welt.json'
 const LOKAL_SCHLUESSEL = 'mmb-welt'
@@ -84,8 +84,26 @@ function istNeuer(a, b) {
   return (a?.geaendert || '') > (b?.geaendert || '')
 }
 
-// Laedt Browser- und Repo-Stand; der juengere gewinnt.
+// Bearbeiten darf nur, wer in der Bar als Admin angemeldet ist (GitHub-Token).
+// Alle anderen sehen nur den veroeffentlichten Stand aus dem Repo.
+function istAdmin() {
+  return Boolean(tokenLesen())
+}
+
+async function ansichtLaden() {
+  try {
+    reise = (await repoLesen()) || leereReise()
+    syncMelden('ansicht')
+  } catch {
+    reise = leereReise()
+    syncMelden('offline')
+  }
+  return reise
+}
+
+// Admin: laedt Browser- und Repo-Stand; der juengere gewinnt.
 async function reiseLaden() {
+  if (!istAdmin()) return ansichtLaden()
   const lokal = lokalLesen()
   reise = lokal
   try {
@@ -93,10 +111,10 @@ async function reiseLaden() {
     if (repo && !istNeuer(lokal, repo)) {
       reise = repo
       lokalSchreiben()
-    } else if (istNeuer(lokal, repo) && tokenLesen()) {
+    } else if (istNeuer(lokal, repo)) {
       planeRepoSpeichern()
     }
-    syncMelden(tokenLesen() ? 'ok' : 'lokal')
+    syncMelden('ok')
   } catch {
     syncMelden('offline')
   }
@@ -105,10 +123,10 @@ async function reiseLaden() {
 
 // ─── Aendern (immer neue Objekte, nie in-place) ──────────────────────────────
 function reiseAendern(neu) {
+  if (!istAdmin()) return reise
   reise = { ...neu, geaendert: new Date().toISOString() }
   lokalSchreiben()
-  if (tokenLesen()) planeRepoSpeichern()
-  else syncMelden('lokal')
+  planeRepoSpeichern()
   return reise
 }
 
@@ -143,7 +161,10 @@ function orteLaenderNachtragen(landAnPunkt) {
   const laender = orte
     .filter(o => ohneLand.some(alt => alt.id === o.id))
     .reduce((l, o) => landDurchOrt(l, o.land), reise.laender)
-  return reiseAendern({ ...reise, laender, orte })
+  const neu = { ...reise, laender, orte }
+  // Besucher sehen das Ergebnis, gespeichert wird es nur vom Admin.
+  if (!istAdmin()) { reise = neu; return reise }
+  return reiseAendern(neu)
 }
 
 function ortEntfernen(id) {
